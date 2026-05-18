@@ -13,6 +13,12 @@ CREATE TABLE IF NOT EXISTS features (
     implied_move REAL,
     recommendationKey TEXT,
     recommendationMean REAL,
+    valuation_pe REAL,
+    sector TEXT,
+    eps_streak INTEGER,
+    sue REAL,
+    volume_confirmation REAL,
+    post_earnings_drift REAL,
     PRIMARY KEY (ticker, earnings_date)
 )
 """)

@@ -7,14 +7,11 @@ conn = sqlite3.connect('data/universe.db')
 c = conn.cursor()
 
 c.execute("""
-CREATE TABLE IF NOT EXISTS features (
-    ticker TEXT,
-    earnings_date TEXT,
-    runup REAL,
-    PRIMARY KEY (ticker, earnings_date)
-)
+    INSERT OR IGNORE INTO features (ticker, earnings_date)
+    SELECT ticker, earnings_date FROM earnings_calendar
+    WHERE earnings_date > date('now')
 """)
-
+conn.commit()
 
 today = date.today()
 df_ed = pd.read_sql(
@@ -63,11 +60,5 @@ for index,row in df_ed.iterrows():
     c.execute("UPDATE features SET runup = ? WHERE ticker = ? AND earnings_date = ?",
           (runup, ticker, ed_clean.strftime("%Y-%m-%d")))
 
-    # If no row existed (c.rowcount == 0), insert a new one
-    if c.rowcount == 0:
-        c.execute("""
-            INSERT OR REPLACE INTO features (ticker, earnings_date, runup, rsi, short_interest)
-            VALUES (?, ?, ?, NULL, NULL)
-        """, (ticker, ed_clean.strftime("%Y-%m-%d"), runup))
-        conn.commit()
+    conn.commit()
 conn.close()

@@ -6,6 +6,13 @@ from datetime import date, timedelta
 conn = sqlite3.connect('data/universe.db')
 c = conn.cursor()
 
+c.execute("""
+    INSERT OR IGNORE INTO features (ticker, earnings_date)
+    SELECT ticker, earnings_date FROM earnings_calendar
+    WHERE earnings_date > date('now')
+""")
+conn.commit()
+
 try:
     c.execute("ALTER TABLE features ADD COLUMN rsi REAL;")
 except sqlite3.OperationalError:
@@ -46,8 +53,5 @@ for index,row in df_ed.iterrows():
     c.execute("UPDATE features SET rsi = ? WHERE ticker = ? AND earnings_date = ?",
           (latest_rsi, ticker, ed_clean.strftime("%Y-%m-%d")))
     print(f"{ticker}: RSI = {latest_rsi:.2f}")
-    if c.rowcount == 0:
-        c.execute("INSERT OR REPLACE INTO features (ticker, earnings_date, runup, rsi) VALUES (?, ?, NULL, ?)",
-                (ticker, ed_clean.strftime("%Y-%m-%d"), float(latest_rsi)))
     conn.commit()
 conn.close()

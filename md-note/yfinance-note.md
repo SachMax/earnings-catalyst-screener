@@ -95,3 +95,7 @@ for t in tickers:
 - Missing fields: Not all stocks have the same info keys. Use info.get('key', 'N/A') to avoid KeyErrors.
 
 - Time zone: Price history uses the exchange's time zone (US stocks = Eastern Time). Keep this in mind when checking earnings dates.
+
+
+## Useful Functions
+- `yf.download("stock", period="", progress = ""True or False")` fetches historical OHLCV (Open, High, Low, Close, Volume) data, progress means to show download progress or not

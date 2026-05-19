@@ -19,6 +19,11 @@ CREATE TABLE IF NOT EXISTS features (
     sue REAL,
     volume_confirmation REAL,
     post_earnings_drift REAL,
+    iv_hv_ratio REAL,
+    sector_relative_strength REAL,
+    seasonality_match INTEGER,
+    gaap_profit INTEGER,
+    eps_beat INTEGER,
     PRIMARY KEY (ticker, earnings_date)
 )
 """)

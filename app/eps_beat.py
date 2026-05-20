@@ -45,7 +45,7 @@ for index,row in df_ed.iterrows():
         if eps_beat is None:
             print(f"{ticker}: error - data not found")
             continue
-        print(f"{ticker}: EPS beat = {eps_beat} | surprise = {eps}")
+        print(f"{ticker}: EPS beat = {eps_beat} | surprise = {eps}%")
 
     except Exception as e:
         print(f"{ticker}: yfinance error – {e}")

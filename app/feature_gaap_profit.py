@@ -3,6 +3,9 @@ from datetime import date, timedelta
 import time
 import pandas as pd
 import sqlite3
+import edgar
+
+edgar.set_identity("sachiomaximilliano166@gmail.com")
 
 conn = sqlite3.connect('data/universe.db')
 c = conn.cursor()
@@ -16,6 +19,10 @@ conn.commit()
 
 try:
     c.execute("ALTER TABLE features ADD COLUMN gaap_profit INTEGER")
+except sqlite3.OperationalError:
+    pass
+try:
+    c.execute("ALTER TABLE features ADD COLUMN sbc_pct_revenue REAL")
 except sqlite3.OperationalError:
     pass
 
@@ -34,6 +41,21 @@ for index,row in df_ed.iterrows():
     except Exception as e:
         print(f"{ticker}: yfinance error – {e}")
         continue
+    try:
+        sbc = stock.info.get('stockBasedCompensation')
+        if sbc is None:
+            company = edgar.Company(ticker)
+            facts = company.get_facts()
+            sbc = facts.get_concept("StockBasedCompensation")   # latest annual
+            revenue = facts.get_revenue()
+        if sbc and revenue and revenue > 0:
+            sbc_pct = round((sbc / revenue) * 100, 2)
+        else:
+            sbc_pct = None
+    except Exception as o:
+        print(f"{ticker}: yfinance error – {o}")
+        sbc_pct = None
+        continue
     time.sleep(0.3)
     if net_income is None:
         print(f"{ticker} -- no GAAP net income data, skipping")
@@ -42,6 +64,8 @@ for index,row in df_ed.iterrows():
     print(f"{ticker}: GAAP profit = {gaap_profit} (net income = ${net_income:,})")
     c.execute("UPDATE features SET gaap_profit = ? WHERE ticker = ? AND earnings_date = ?",
           (gaap_profit, ticker, ed_clean.strftime("%Y-%m-%d")))
+    c.execute("UPDATE features SET sbc_pct_revenue = ? WHERE ticker = ? AND earnings_date = ?",
+          (sbc_pct, ticker, ed_clean.strftime("%Y-%m-%d")))
     conn.commit()
 conn.close()
     

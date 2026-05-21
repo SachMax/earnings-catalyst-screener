@@ -19,6 +19,14 @@ try:
     c.execute("ALTER TABLE features ADD COLUMN past_pullback_bounce TEXT;")
 except sqlite3.OperationalError:
     pass   # column already exists
+try:
+    c.execute("ALTER TABLE features ADD COLUMN pullback_bounce_count INTEGER;")
+except sqlite3.OperationalError:
+    pass   # column already exists
+try:
+    c.execute("ALTER TABLE features ADD COLUMN avg_pullback_depth real;")
+except sqlite3.OperationalError:
+    pass   # column already exists
 
 today = date.today()
 df_ed = pd.read_sql(
@@ -64,6 +72,7 @@ for index,row in df_ed.iterrows():
 
             recent = past_earnings.sort_index().tail(4)
             reactions = []
+            pullback_bounce_sum = 0
             for _,erow in recent.iterrows():
                 hist_date = erow.name.date()
                 d1 = hist_date + timedelta(days=1)
@@ -94,13 +103,23 @@ for index,row in df_ed.iterrows():
                     if pullback_pct <= -0.02 and final_close > post_high:
                         label = "pullback and bounce"
                         reactions.append(label)
+                        pullback_bounce_sum += pullback_pct
                     else:
                         label = "no bounce"
                         reactions.append(label)
                 except Exception as t:
                     print(f"{ticker}: error - {t}")
                     continue
-            
+            total = len(reactions)
+            pullback_bounce_count = None
+            pull_back_avg = None
+            if total > 0:
+                pullback_bounce_count = reactions.count("pullback and bounce")
+                if pullback_bounce_count > 0 and pullback_bounce_sum != 0:
+                    pull_back_avg = round((pullback_bounce_sum * 100) / pullback_bounce_count, 2) 
+            else:
+                pass
+
         except Exception as o:
             print(f"{ticker}: error -> {o}")
             continue
@@ -112,7 +131,15 @@ for index,row in df_ed.iterrows():
     except Exception as e:
         print(f"{ticker}: error -> {e}")
         continue
-    c.execute("UPDATE features SET past_pullback_bounce = ? WHERE ticker = ? AND earnings_date = ?",
+    if pullback_bounce_count is not None:
+        c.execute("UPDATE features SET pullback_bounce_count = ? WHERE ticker = ? AND earnings_date = ?",
+        (pullback_bounce_count, ticker, ed_clean.strftime("%Y-%m-%d")))
+    if pull_back_avg is not None:
+        print(f"pullback bounce avg = {pull_back_avg}")
+        c.execute("UPDATE features SET avg_pullback_depth = ? WHERE ticker = ? AND earnings_date = ?",
+        (pull_back_avg, ticker, ed_clean.strftime("%Y-%m-%d")))
+    if most_common is not None:
+        c.execute("UPDATE features SET past_pullback_bounce = ? WHERE ticker = ? AND earnings_date = ?",
           (most_common, ticker, ed_clean.strftime("%Y-%m-%d")))
     conn.commit()
 conn.close()

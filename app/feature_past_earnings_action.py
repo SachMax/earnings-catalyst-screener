@@ -19,6 +19,22 @@ try:
     c.execute("ALTER TABLE features ADD COLUMN past_earnings_action TEXT;")
 except sqlite3.OperationalError:
     pass   # column already exists
+try:
+    c.execute("ALTER TABLE features ADD COLUMN surge_hold_count INTEGER;")
+except sqlite3.OperationalError:
+    pass   # column already exists
+try:
+    c.execute("ALTER TABLE features ADD COLUMN fade_count INTEGER;")
+except sqlite3.OperationalError:
+    pass   # column already exists
+try:
+    c.execute("ALTER TABLE features ADD COLUMN drop_count INTEGER;")
+except sqlite3.OperationalError:
+    pass   # column already exists
+try:
+    c.execute("ALTER TABLE features ADD COLUMN pct_surge_hold REAL;")
+except sqlite3.OperationalError:
+    pass   # column already exists
 
 today = date.today()
 df_ed = pd.read_sql(
@@ -103,12 +119,37 @@ for index,row in df_ed.iterrows():
         if len(historical_action) < 2:
             print(f"{ticker}: not enough data, skipping...")
             continue
+        total = len(historical_action)
+        surge_count = None
+        fade_count = None
+        drop_count = None
+        pct_surge = None
+        if total > 0:
+            surge_count = historical_action.count('Surge & Hold')
+            fade_count = historical_action.count('Fade')
+            drop_count = historical_action.count('Drop')
+            pct_surge = round(surge_count/total, 2)
+        else:
+            pass
         most_common = max(historical_action, key=historical_action.count)
         print(f"{ticker}: most common past earnings reaction = {most_common} from {historical_action}")
     except Exception as e:
         print(f"{ticker}: error -> {e}")
         continue
-    c.execute("UPDATE features SET past_earnings_action = ? WHERE ticker = ? AND earnings_date = ?",
-          (most_common, ticker, ed_clean.strftime("%Y-%m-%d")))
+    if surge_count is not None:
+        c.execute("UPDATE features SET surge_hold_count = ? WHERE ticker = ? AND earnings_date = ?",
+        (surge_count, ticker, ed_clean.strftime("%Y-%m-%d")))
+    if fade_count is not None:
+        c.execute("UPDATE features SET fade_count = ? WHERE ticker = ? AND earnings_date = ?",
+        (fade_count, ticker, ed_clean.strftime("%Y-%m-%d")))
+    if drop_count is not None:
+        c.execute("UPDATE features SET drop_count = ? WHERE ticker = ? AND earnings_date = ?",
+        (drop_count, ticker, ed_clean.strftime("%Y-%m-%d")))
+    if most_common is not None:
+        c.execute("UPDATE features SET past_earnings_action = ? WHERE ticker = ? AND earnings_date = ?",
+            (most_common, ticker, ed_clean.strftime("%Y-%m-%d")))
+    if pct_surge is not None:
+        c.execute("UPDATE features SET pct_surge_hold = ? WHERE ticker = ? AND earnings_date = ?",
+            (pct_surge, ticker, ed_clean.strftime("%Y-%m-%d")))
     conn.commit()
 conn.close()

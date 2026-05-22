@@ -36,6 +36,10 @@ try:
     c.execute("ALTER TABLE features ADD COLUMN current_earnings_quality INTEGER;")
 except sqlite3.OperationalError:
     pass   # column already exists
+try:
+    c.execute("ALTER TABLE features ADD COLUMN revenue_growth_YoY INTEGER;")
+except sqlite3.OperationalError:
+    pass   # column already exists
 
 today = date.today()
 df_ed = pd.read_sql(
@@ -96,6 +100,7 @@ for index,row in df_ed.iterrows():
             ocf_ni_ratio = None
             fcf_positive = None
             score = None
+            revenue_beat = None
 
             if ocf is not None and ni is not None and ni !=0:
                 ocf_ni_ratio = round(ocf/ni, 2)
@@ -129,6 +134,11 @@ for index,row in df_ed.iterrows():
                 score = 1
             if fcf_positive is not None and fcf_positive == 0:           # negative FCF
                 score = 1
+            
+            if revenue_latest is not None and revenue_prev is not None and revenue_prev > 0:
+                revenue_beat = 1 if revenue_latest > revenue_prev else 0
+            else:
+                revenue_beat = None
         except Exception as o:
             print(f"{ticker}: error -> {o}")
             continue
@@ -140,6 +150,7 @@ for index,row in df_ed.iterrows():
         else:
             quality = 'Low'
         print(f"{ticker}: Current earnings quality: {quality}")
+        print(f"{ticker}: revenue_latest = {revenue_latest}, revenue_prev = {revenue_prev}")
     except Exception as e:
         print(f"{ticker}: error -> {e}")
         continue
@@ -158,5 +169,8 @@ for index,row in df_ed.iterrows():
     if score is not None:
         c.execute("UPDATE features SET current_earnings_quality = ? WHERE ticker = ? AND earnings_date = ?",
             (score, ticker, ed_clean.strftime("%Y-%m-%d")))
+    if revenue_beat is not None:
+        c.execute("UPDATE features SET revenue_growth_YoY = ? WHERE ticker = ? AND earnings_date = ?",
+            (revenue_beat, ticker, ed_clean.strftime("%Y-%m-%d")))
     conn.commit()
 conn.close()

@@ -68,7 +68,7 @@ for index,row in df_ed.iterrows():
                 if summary.primary_activity in ('Purchase'):
                     total_buy_value += summary.net_value
                     buy_count += 1
-                if summary.primary_activity in ('Sell'):
+                if summary.primary_activity in ('Sale'):
                     total_sell_value += abs(summary.net_value)
                     sell_count += 1
                 insider_net_value = round(total_buy_value - total_sell_value, 2)

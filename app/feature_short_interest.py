@@ -7,6 +7,13 @@ import sqlite3
 conn = sqlite3.connect('data/universe.db')
 c = conn.cursor()
 
+c.execute("""
+    INSERT OR IGNORE INTO features (ticker, earnings_date)
+    SELECT ticker, earnings_date FROM earnings_calendar
+    WHERE earnings_date > date('now')
+""")
+conn.commit()
+
 try:
     c.execute("ALTER TABLE features ADD COLUMN short_interest REAL;")
 except sqlite3.OperationalError:
@@ -37,9 +44,6 @@ for index,row in df_ed.iterrows():
     print(f"\n{ticker}: short interest = {si}")
     c.execute("UPDATE features SET short_interest = ? WHERE ticker = ? AND earnings_date = ?",
           (float(si), ticker, ed_clean.strftime("%Y-%m-%d")))
-    if c.rowcount == 0:
-        c.execute("INSERT OR REPLACE INTO features (ticker, earnings_date, runup, rsi, short_interest) VALUES (?, ?, NULL, NULL, ?)",
-                (ticker, ed_clean.strftime("%Y-%m-%d"), float(si)))
     conn.commit()
 conn.close()
     

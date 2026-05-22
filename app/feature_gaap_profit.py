@@ -42,12 +42,10 @@ for index,row in df_ed.iterrows():
         print(f"{ticker}: yfinance error – {e}")
         continue
     try:
-        sbc = stock.info.get('stockBasedCompensation')
-        if sbc is None:
-            company = edgar.Company(ticker)
-            facts = company.get_facts()
-            sbc = facts.get_concept("StockBasedCompensation")   # latest annual
-            revenue = facts.get_revenue()
+        company = edgar.Company(ticker)
+        facts = company.get_facts()
+        sbc = facts.get_concept("StockBasedCompensation")   # latest annual
+        revenue = facts.get_revenue()
         if sbc and revenue and revenue > 0:
             sbc_pct = round((sbc / revenue) * 100, 2)
         else:

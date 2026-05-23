@@ -13,14 +13,14 @@ CREATE TABLE IF NOT EXISTS price_history (
 """)
 
 c.execute("""
-CREATE TABLE IF NOT EXISTS earnings_calender (
+CREATE TABLE IF NOT EXISTS earnings_calendar (
           ticker TEXT, earnings_date TEXT, eps_estimate REAL, revenue_estimate REAL, PRIMARY KEY(ticker, earnings_date))
 """)
 
 today = date.today()
 cutoff = today + timedelta(days=60)
 
-tickers = ["NVDA", "WMT", "PEP", "TSM", "GS"]
+tickers = ["NVDA", "WMT", "PEP", "TSM", "GS", "AVGO", "CRWD"]
 inserted_rows = 0
 for i in tickers:
     print(f"\nChecking {i}...")
@@ -69,7 +69,7 @@ for i in tickers:
                 eps_est = cal['Earnings Average']
             if 'Revenue Average' in cal:
                 rev_est = cal['Revenue Average']
-            c.execute("INSERT OR REPLACE INTO earnings_calender VALUES (?, ?, ?, ?)", (i, next_earnings, eps_est, rev_est))
+            c.execute("INSERT OR REPLACE INTO earnings_calendar VALUES (?, ?, ?, ?)", (i, next_earnings, eps_est, rev_est))
             conn.commit()
         else:
             print(f"{i}: no upcoming earnings within 60 days")

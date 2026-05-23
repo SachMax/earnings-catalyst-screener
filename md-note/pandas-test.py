@@ -1,8 +1,8 @@
-from edgar import Company
-import edgar
+import sqlite3
 
-edgar.set_identity("sachiomaximilliano166@gmail.com")
-from edgar import Company
-company = edgar.Company("GS")
-income = company.get_financials().income_statement().to_dataframe()
-print(income[income['label'].str.contains('Revenue|Interest income', case=False, na=False)]['label'].unique())
+conn = sqlite3.connect('data/universe.db')
+c = conn.cursor()
+c.execute("SELECT ticker, earnings_date FROM earnings_calendar WHERE ticker='PEP' ORDER BY earnings_date DESC LIMIT 1")
+row = c.fetchone()
+print("Row from DB:", row)
+conn.close()

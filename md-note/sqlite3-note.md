@@ -110,3 +110,33 @@ Use INSERT OR REPLACE to avoid duplicate‑key errors:
 ```
 **Always use ? placeholders – never insert values directly into the SQL string (security risk).**
 
+```python
+import sqlite3
+
+conn = sqlite3.connect('data.db')
+c = conn.cursor
+
+# to create the table for the first time
+c.execute("""
+CREATE TABLE IF NOT EXISTS data (
+first text, second text, last text, number integer, float_number real)
+""")
+
+#to insert new data with values
+c.execute("INSERT INTO data values (?, ?, ?, ?, ?)", ('hi', 'test', 'yay', 1, 50.802))
+
+#you can also use dictionaries 
+c.execute("INSERT INTO data values (:first, :second, :last, :number, :float_number)", {'first':'hi', 'second':'test', 'last':'yay', 'number':1, 'float_number':50.802})
+
+#select certain data from a database
+c.execute("SELECT * FROM data WHERE last='yay'")
+c.execute("SELECT * FROM data WHERE last=?", ('yay', 'etc'))
+
+c.fetchone() # to return just the next row as a tuple, the same its inserted
+c.fetchmany(integer) #return a list of tuples that fullfil the criteria
+c.fetchall() # same like c.fetchmany() but it returns all
+
+
+conn.commit()
+conn.close()
+```

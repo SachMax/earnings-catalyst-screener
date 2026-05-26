@@ -49,20 +49,22 @@ for index, row in df_ed.iterrows():
     try:
         stock = yf.Ticker(ticker)
         earnings_hist = stock.earnings_dates
-        if earnings_hist is None or earnings_hist.empty:
-            print(f"{ticker}: no earnings history from yfinance")
-            continue
+        if earnings_hist is not None and not earnings_hist.empty:
+            reported = earnings_hist[earnings_hist['Reported EPS'].notna()]
+            if not reported.empty:
+                last_report_date = reported.index[0].date()
+            else:
+                last_report_date = ed_clean
+        else:
+            last_report_date = ed_clean
+    except Exception:
+        last_report_date = ed_clean
 
-        reported = earnings_hist[earnings_hist['Reported EPS'].notna()]
-        if reported.empty:
-            print(f"{ticker}: no reported earnings dates")
-            continue
+    print(f"{ticker}: using earnings date {last_report_date}")
 
-        last_report_date = reported.index[0].date()
-        print(f"{ticker}: last reported earnings was {last_report_date}")
-
-        start = last_report_date - timedelta(days=4)
-        end   = last_report_date + timedelta(days=4)
+    start = last_report_date - timedelta(days=4)
+    end   = last_report_date + timedelta(days=4)
+    try:
         company = edgar.Company(ticker)
         filings = company.get_filings(form="8-K", filing_date=f"{start}:{end}")
         time.sleep(0.3)
@@ -152,6 +154,16 @@ for index, row in df_ed.iterrows():
             print(f"\n=== {ticker} AFFIRM SNIPPET ===")
             print(snippet)
             break
+        if not snippet_raise and not snippet_affirm:
+            # Look for a dollar amount or a percentage anywhere in the snippet
+            import re
+            if re.search(r'\$\d+\.?\d*\s*(billion|million)', snippet) or \
+               re.search(r'\d+\.?\d*\s*\%', snippet) or \
+               re.search(r'revenue.*\d+\.?\d*\s*(billion|million)', snippet):
+                guidance_valid = 1
+                print(f"\n=== {ticker} NUMERIC GUIDANCE SNIPPET ===")
+                print(snippet)
+                break
 
         search_start = idx + 1
 

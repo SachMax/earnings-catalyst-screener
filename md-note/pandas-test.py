@@ -1,8 +1,10 @@
-import edgar
+import edgar 
+import  yfinance as yf
+import pandas as pd
+from datetime import timedelta
+import time
+edgar.set_identity("sachiomaximilliano166@gmail.com")
 
-edgar.set_identity("sachiomximilliano166@gmail.com")
 
-eightk = edgar.Company("TSLA").get_filings(form="8-K").latest()
-print(eightk.items)           # reported event types
-print(eightk.earnings) 
-print(eightk)
+jpm = edgar.Company('JPM')
+print(jpm.get_quarterly_financials)

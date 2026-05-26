@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import date, timedelta
 import edgar
 import logging
+import yfinance as yf
 logging.getLogger("edgar").setLevel(logging.ERROR)
 
 edgar.set_identity("sachiomaximilliano166@gmail.com")
@@ -19,7 +20,7 @@ conn.commit()
 
 # Add required columns
 for col in ['current_gm_change_bps', 'current_sbc_pct', 'current_ocf_ni_ratio',
-            'current_fcf_positive', 'current_earnings_quality', 'revenue_growth_YoY', 'revenue_beat']:
+            'current_fcf_positive', 'current_earnings_quality']:
     try:
         c.execute(f"ALTER TABLE features ADD COLUMN {col} {'INTEGER' if 'positive' in col or 'quality' in col or 'YoY' in col else 'REAL'}")
     except sqlite3.OperationalError:
@@ -30,10 +31,6 @@ df_ed = pd.read_sql("""
     SELECT * FROM earnings_calendar
     WHERE earnings_date > ?
 """, conn, params=(today.strftime("%Y-%m-%d"),), parse_dates='earnings_date')
-
-def get_value(df, label, quarter):
-    row = df[df['label'] == label]
-    return row[quarter].iloc[0] if not row.empty else None
 
 for index, row in df_ed.iterrows():
     # ---- initialize all printed variables to avoid NameError ----
@@ -51,83 +48,74 @@ for index, row in df_ed.iterrows():
         ticker = row['ticker']
         ed_clean = row['earnings_date'].date()
 
-        if ticker == 'TSM':
-            print(f"{ticker}: skipping – insufficient quarterly data")
-            continue
-
         try:
-            company = edgar.Company(ticker)
-            facts = company.get_facts()
-            income_df = facts.income_statement(periods=20, annual=False, as_dataframe=True)
-            cashflow_df = facts.cashflow_statement(periods=4, annual=False, as_dataframe=True)
+            stock = yf.Ticker(ticker)
+            income_df = stock.quarterly_financials
+            cashflow_df = stock.quarterly_cashflow
+            income_df = income_df[sorted(income_df.columns, reverse=True)]
+            cashflow_df = cashflow_df[sorted(cashflow_df.columns, reverse=True)]
 
-            # --- Simple, robust column detection ---
-            meta_cols = {'label', 'depth', 'is_abstract', 'is_total', 'section', 'confidence'}
-            date_cols = [col for col in income_df.columns if col not in meta_cols]
-            if len(date_cols) < 5:
-                print(f"{ticker}: not enough quarterly columns, skipping")
+            if income_df.shape[1] < 5:
+                print(f"{ticker}: not enough quarterly data, skipping")
                 continue
-
-            latest_q = date_cols[0]
-            prev_year_q = date_cols[4]   # will be overwritten if revenue uses a different quarter
-
-            # --- Revenue search (multi-label, walk back up to 4 quarters) ---
-            revenue_labels = [
-                'Total Revenue', 'Revenues', 'Total net revenues',
-                'Total non-interest revenues', 'Total interest income',
-                'Total revenues', 'Revenue from contracts with customers'
-            ]
-
-            revenue_latest = None
-            revenue_prev = None
-            latest_q_used = None
-
-            for lbl in revenue_labels:
-                for col in date_cols[:4]:
-                    val = get_value(income_df, lbl, col)
-                    if val is not None and pd.notna(val):
-                        revenue_latest = val
-                        latest_q_used = col
-                        break
-                if revenue_latest is not None:
-                    break
-
-            # Get same quarter a year earlier for revenue
-            if revenue_latest is not None and latest_q_used is not None:
-                idx = date_cols.index(latest_q_used)
-                if idx + 4 < len(date_cols):
-                    prev_year_q = date_cols[idx + 4]          # use the consistent quarter for everything
-                    revenue_prev = get_value(income_df, lbl, prev_year_q)
-                    if revenue_prev is None or pd.isna(revenue_prev):
-                        revenue_prev = None
-
+            
+            latest_q = income_df.columns[0]
+            prev_year_q = income_df.columns[4]
             # --- Other income statement items (using the now consistent prev_year_q) ---
-            cost_of_rev_latest = get_value(income_df, 'Cost of Revenue', latest_q)
-            cost_of_rev_prev = get_value(income_df, 'Cost of Revenue', prev_year_q)
-            ni = get_value(income_df, 'Net Income (Loss) Attributable to Parent', latest_q)
+            revenue_latest = income_df.loc["Total Revenue", latest_q]
+            revenue_prev = income_df.loc["Total Revenue", prev_year_q]
+            cost_of_rev_latest = income_df.loc["Cost Of Revenue", latest_q] if "Cost Of Revenue" in income_df.index else None
+            cost_of_rev_prev  = income_df.loc["Cost Of Revenue", prev_year_q] if "Cost Of Revenue" in income_df.index else None
+            ni = income_df.loc["Net Income", latest_q]
 
             # --- Cash flow items (same period) ---
-            ocf = get_value(cashflow_df, 'Net Cash Provided by (Used in) Operating Activities', latest_q)
+            # Safely extract cash‑flow items – if a label doesn't exist, leave as None
+            ocf = cashflow_df.loc["Operating Cash Flow", latest_q] if "Operating Cash Flow" in cashflow_df.index else None
+            try:
+                sbc_q = cashflow_df.loc["Stock Based Compensation", latest_q]
+            except KeyError:
+                sbc_q = None
+            try:
+                capex = cashflow_df.loc["Capital Expenditure", latest_q]
+            except KeyError:
+                capex = None
 
-            # SBC
-            sbc_annual = None
-            sbc_row = income_df[income_df['label'].str.contains(
-                'Share.?Based|Stock.?Based|Compensation', case=False, na=False, regex=True)]
-            if not sbc_row.empty:
-                sbc_q = sbc_row[latest_q].iloc[0]
-                if pd.notna(sbc_q):
-                    sbc_annual = sbc_q * 4
+            if ocf is None or sbc_q is None or capex is None:
+                try:
+                    facts = edgar.Company(ticker).get_facts()
+                    cf_df = facts.cashflow_statement(periods=4, annual=False, as_dataframe=True)
+                    cf_cols = [c for c in cf_df.columns if c not in ('label', 'depth', 'is_abstract', 'is_total', 'section', 'confidence')]
+                    if cf_cols:
+                        latest_cf_col = cf_cols[0]
+                        if ocf is None:
+                            ocf_labels = [
+                                "Net Cash Provided by (Used in) Operating Activities",
+                                "Net cash (used in) operating activities",
+                                "Operating Cash Flow"
+                            ]
+                            for lbl in ocf_labels:
+                                try:
+                                    ocf_test = float(cf_df.loc[lbl, latest_cf_col])
+                                    if ocf_test is not None:
+                                        ocf = ocf_test
+                                        break
+                                except (KeyError, IndexError):
+                                    continue
+                        if capex is None:
+                            capex = facts.get_concept("capex")
+                        if sbc_q is None:
+                            for lbl in ["ShareBasedCompensation", "Share-based Payment Arrangement, Noncash Expense",
+                            "Share-based Payment Arrangement, Expensed and Capitalized, Amount", "Stock Based Compensation"]:
+                                try:
+                                    val = cf_df.loc[lbl, latest_cf_col].item()
+                                    if val is not None:
+                                        sbc_q = val
+                                        break
+                                except (KeyError, IndexError):
+                                    continue
+                except:
+                    pass
 
-            # Capex
-            capex = None
-            capex_row = cashflow_df[cashflow_df['label'].str.contains(
-                'Capital|PaymentsToAcquireProperty|Equipment', case=False, na=False, regex=True)]
-            if not capex_row.empty:
-                capex_q = capex_row[latest_q].iloc[0]
-                if pd.notna(capex_q):
-                    capex = capex_q * 4
-
-            # Derived metrics
             gm_change_bps = None
             if all(v is not None for v in [revenue_latest, cost_of_rev_latest, revenue_prev, cost_of_rev_prev]):
                 gm_latest = ((revenue_latest - cost_of_rev_latest) / revenue_latest) * 100
@@ -135,8 +123,8 @@ for index, row in df_ed.iterrows():
                 gm_change_bps = round(gm_latest - gm_prev, 2)
 
             sbc_pct = None
-            if sbc_annual is not None and revenue_latest is not None and revenue_latest > 0:
-                sbc_pct = round((sbc_annual / 4) / revenue_latest * 100, 2)
+            if sbc_q is not None and revenue_latest is not None and revenue_latest > 0:
+                sbc_pct = round((sbc_q / revenue_latest) * 100, 2)
 
             ocf_ni_ratio = None
             if ocf is not None and ni is not None and ni != 0:
@@ -144,9 +132,9 @@ for index, row in df_ed.iterrows():
 
             fcf_positive = None
             if capex is not None:
-                capex_q = capex / 4
-                fcf = ocf - capex_q if ocf is not None else None
+                fcf = ocf + capex if ocf is not None else None
                 fcf_positive = 1 if (fcf is not None and fcf > 0) else 0
+
 
             # --- Earnings quality score (component-based, v2.9 aligned) ---
             components = []
@@ -209,7 +197,7 @@ for index, row in df_ed.iterrows():
                 revenue_beat = 1 if revenue_latest > revenue_prev else 0
 
         except Exception as o:
-            print(f"{ticker}: EDGAR error – {o}")
+            print(f"{ticker}: error – {o}")
             continue
 
         print(f"{ticker}: Current earnings quality: {quality}")
@@ -237,11 +225,6 @@ for index, row in df_ed.iterrows():
     if score is not None:
         c.execute("UPDATE features SET current_earnings_quality = ? WHERE ticker = ? AND earnings_date = ?",
                   (score, ticker, ed_clean.strftime("%Y-%m-%d")))
-    if revenue_beat is not None:
-        c.execute("UPDATE features SET revenue_growth_YoY = ? WHERE ticker = ? AND earnings_date = ?",
-                  (revenue_beat, ticker, ed_clean.strftime("%Y-%m-%d")))
-    c.execute("UPDATE features SET revenue_beat = NULL WHERE ticker = ? AND earnings_date = ?",
-              (ticker, ed_clean.strftime("%Y-%m-%d")))
     conn.commit()
 
 conn.close()

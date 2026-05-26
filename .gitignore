@@ -1,2 +1,4 @@
-*.csv
 *.db
+*.csv
+*.env
+app/config.py

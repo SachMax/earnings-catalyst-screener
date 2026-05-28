@@ -125,7 +125,7 @@ for index,row in df_ed.iterrows():
                     downgrade_count += 1
             print(f"{ticker}:downgrades count = {downgrade_count}\n")
             market_punishing_val = 0
-            if etf_return < -3.00 and downgrade_count >= 2:
+            if etf_return.iloc[0] < -3.00 and downgrade_count >= 2:
                 market_punishing_val = 1 #TRUE since its negative
             else:
                 market_punishing_val = 0

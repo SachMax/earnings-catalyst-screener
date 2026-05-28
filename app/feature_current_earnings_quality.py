@@ -20,7 +20,7 @@ conn.commit()
 
 # Add required columns
 for col in ['current_gm_change_bps', 'current_sbc_pct', 'current_ocf_ni_ratio',
-            'current_fcf_positive', 'current_earnings_quality']:
+            'current_fcf_positive', 'current_earnings_quality', 'revenue_growth_YoY']:
     try:
         c.execute(f"ALTER TABLE features ADD COLUMN {col} {'INTEGER' if 'positive' in col or 'quality' in col or 'YoY' in col else 'REAL'}")
     except sqlite3.OperationalError:
@@ -91,7 +91,8 @@ for index, row in df_ed.iterrows():
                             ocf_labels = [
                                 "Net Cash Provided by (Used in) Operating Activities",
                                 "Net cash (used in) operating activities",
-                                "Operating Cash Flow"
+                                "Operating Cash Flow",
+                                'NetCashProvidedByUsedInOperatingActivities'
                             ]
                             for lbl in ocf_labels:
                                 try:
@@ -102,20 +103,33 @@ for index, row in df_ed.iterrows():
                                 except (KeyError, IndexError):
                                     continue
                         if capex is None:
-                            capex = facts.get_concept("capex")
-                        if sbc_q is None:
-                            for lbl in ["ShareBasedCompensation", "Share-based Payment Arrangement, Noncash Expense",
-                            "Share-based Payment Arrangement, Expensed and Capitalized, Amount", "Stock Based Compensation"]:
+                            for lbl in [
+                                    "Capital Expenditure",
+                                    "Capital Expenditures",
+                                    "Payments to Acquire Property, Plant, and Equipment",
+                                    "PaymentsToAcquirePropertyPlantAndEquipment",
+                                    "CapitalExpendituresIncurredButNotYetPaid"
+                                ]:
                                 try:
-                                    val = cf_df.loc[lbl, latest_cf_col].item()
-                                    if val is not None:
-                                        sbc_q = val
-                                        break
+                                    capex = float(cf_df.loc[lbl, latest_cf_col])
+                                    break
+                                except (KeyError, IndexError):
+                                    continue
+
+                        # --- SBC (with per‑label try/except) ---
+                        if sbc_q is None:
+                            for lbl in ["ShareBasedCompensation",
+                                        "Share-based Payment Arrangement, Noncash Expense",
+                                        "Share-based Payment Arrangement, Expensed and Capitalized, Amount",
+                                        "Stock Based Compensation",
+                                        "AllocatedShareBasedCompensationExpense"]:
+                                try:
+                                    sbc_q = float(cf_df.loc[lbl, latest_cf_col])
+                                    break
                                 except (KeyError, IndexError):
                                     continue
                 except:
                     pass
-
             gm_change_bps = None
             if all(v is not None for v in [revenue_latest, cost_of_rev_latest, revenue_prev, cost_of_rev_prev]):
                 gm_latest = ((revenue_latest - cost_of_rev_latest) / revenue_latest) * 100
@@ -225,6 +239,9 @@ for index, row in df_ed.iterrows():
     if score is not None:
         c.execute("UPDATE features SET current_earnings_quality = ? WHERE ticker = ? AND earnings_date = ?",
                   (score, ticker, ed_clean.strftime("%Y-%m-%d")))
+    if revenue_beat is not None:
+        c.execute("UPDATE features SET revenue_growth_YoY = ? WHERE ticker = ? AND earnings_date = ?",
+              (revenue_beat, ticker, ed_clean.strftime("%Y-%m-%d")))
     conn.commit()
 
 conn.close()

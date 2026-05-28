@@ -1,10 +1,3 @@
-import edgar 
-import  yfinance as yf
-import pandas as pd
-from datetime import timedelta
-import time
-edgar.set_identity("sachiomaximilliano166@gmail.com")
+import os
 
-
-jpm = edgar.Company('JPM')
-print(jpm.get_quarterly_financials)
+print(os.listdir("C:\\Users\Sachio\\OneDrive\\Desktop\\earnings-catalyst-screener\\app"))

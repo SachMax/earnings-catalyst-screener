@@ -2,6 +2,7 @@ import sqlite3
 import pandas as pd
 from datetime import date, timedelta
 import numpy as np
+import time
 import yfinance as yf
 
 conn = sqlite3.connect('data/universe.db')
@@ -35,11 +36,15 @@ for index,row in df_ed.iterrows():
         if df.empty:
             print(f"{ticker}: no price data, skipping")
             continue
-        try:
-            stock = yf.Ticker(ticker)
-            earnings_hist = stock.earnings_dates
-        except Exception as E:
-            print(f"{ticker}: error -> {E}")
+        for attempt in range(3):
+            try:
+                stock = yf.Ticker(ticker)
+                earnings_hist = stock.earnings_dates
+                break
+            except Exception:
+                time.sleep(2)
+        else:
+            print(f"{ticker}: yfinance timed out after retries")
             continue
         if earnings_hist is None or earnings_hist.empty:
             print(f"{ticker} - not earnings history data")

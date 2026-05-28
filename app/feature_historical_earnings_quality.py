@@ -20,9 +20,9 @@ conn.commit()
 
 # Add required historical columns
 for col in ['hist_gm_change_avg', 'hist_sbc_pct_avg', 'hist_ocf_ni_avg',
-            'hist_fcf_quarters', 'hist_earnings_quality']:
+            'hist_fcf_quarters', 'hist_earnings_quality', 'revenue_growth_streak']:
     try:
-        c.execute(f"ALTER TABLE features ADD COLUMN {col} {'INTEGER' if 'fcf_quarters' in col or 'quality' in col else 'REAL'}")
+        c.execute(f"ALTER TABLE features ADD COLUMN {col} {'INTEGER' if 'fcf_quarters' in col or 'quality' in col or 'streak' in col else 'REAL'}")
     except sqlite3.OperationalError:
         pass
 
@@ -44,31 +44,6 @@ def get_value(df, label, quarter):
         pass
     return None
 
-def parse_quarter_key(col):
-    """
-    Return (year, quarter) for sorting, handling:
-    - pandas Period objects
-    - strings like 'Q1 2026'
-    - strings like '2026Q1'
-    """
-    if isinstance(col, pd.Period):
-        return (col.year, col.quarter)
-    s = str(col).strip().upper()
-    # Format: 'Q1 2026'
-    if ' ' in s and s.startswith('Q'):
-        parts = s.split()
-        try:
-            return (int(parts[1]), int(parts[0][1]))
-        except (ValueError, IndexError):
-            pass
-    # Format: '2026Q1'
-    if 'Q' in s and len(s) >= 5 and s[:4].isdigit():
-        try:
-            return (int(s[:4]), int(s[5]))
-        except (ValueError, IndexError):
-            pass
-    return (0, 0)
-
 for index, row in df_ed.iterrows():
     # Initialize all printed/output variables to prevent NameError
     hist_score = None
@@ -77,14 +52,12 @@ for index, row in df_ed.iterrows():
     avg_sbc = None
     avg_ocf = None
     fcf_pos_count = None
+    yoy_growth_streak = 0
+    streak_alive = True
 
     try:
         ticker = row['ticker']
         ed_clean = row['earnings_date'].date()
-
-        if ticker == 'TSM':
-            print(f"{ticker}: skipping – insufficient quarterly data")
-            continue
 
         try:
             company = edgar.Company(ticker)
@@ -95,7 +68,6 @@ for index, row in df_ed.iterrows():
             # --- Simple, robust column detection (no regex) ---
             meta_cols = {'label', 'depth', 'is_abstract', 'is_total', 'section', 'confidence'}
             date_cols = [col for col in income_df.columns if col not in meta_cols]
-            date_cols.sort(key=parse_quarter_key, reverse=True)
 
             if len(date_cols) < 9:
                 print(f"{ticker}: not enough quarterly columns for historical (need at least 8 quarters), skipping")
@@ -106,6 +78,7 @@ for index, row in df_ed.iterrows():
             sbc_pcts = []
             ocf_nis = []
             fcf_positive_quarters = 0
+            yoy_growth_streak = 0
 
             # Score the four most recent completed quarters (indices 1-4)
             quarterly_scores = []
@@ -117,10 +90,17 @@ for index, row in df_ed.iterrows():
                     print(f"  Skipping quarter {i} for {ticker}: column index out of range")
                     quarterly_scores.append(2)
                     continue
+                
+                cost_of_rev_latest = None
+                cost_of_rev_prev = None
+                ni = None
+                ocf = None
+                sbc_q = None
+                capex = None
 
                 # --- Revenue extraction (multi-label) ---
                 revenue_labels = [
-                    'Total Revenue', 'Revenues', 'Total net revenues',
+                    'Total Revenue', 'RevenueFromContractWithCustomerExcludingAssessedTax','Revenues', 'Total net revenues',
                     'Total non-interest revenues', 'Total interest income',
                     'Total revenues', 'Revenue from contracts with customers'
                 ]
@@ -139,37 +119,73 @@ for index, row in df_ed.iterrows():
                 if revenue_latest is None:
                     quarterly_scores.append(2)
                     continue
-
-                cost_of_rev_latest = get_value(income_df, 'Cost of Revenue', q_col)
-                cost_of_rev_prev = get_value(income_df, 'Cost of Revenue', prev_year_col)
-                ni = get_value(income_df, 'Net Income (Loss) Attributable to Parent', q_col)
-
-                ocf = get_value(cashflow_df, 'Net Cash Provided by (Used in) Operating Activities', q_col)
+                
+                cost_of_rev_lbl = ['Cost of Revenue', 'CostOfGoodsAndServicesSold', 'CostOfRevenue']
+                for m in cost_of_rev_lbl:
+                    cost_rev1 = get_value(income_df, m, q_col)
+                    if cost_rev1 is not None and pd.notna(cost_rev1):
+                        cost_of_rev_latest = cost_rev1
+                        cost_of_rev_prev = get_value(income_df, m, prev_year_col)
+                        if cost_of_rev_prev is None or pd.isna(cost_of_rev_prev):
+                            cost_of_rev_prev = None
+                        break
+                ni_lbl = ['Net Income (Loss) Attributable to Parent', 'NetIncomeLoss']
+                for j in ni_lbl:
+                    ni_test = get_value(income_df, j, q_col)
+                    if ni_test is not None and pd.notna(ni_test):
+                        ni = ni_test
+                        break
+                
+                ocf_lbl = [
+                    "Net Cash Provided by (Used in) Operating Activities",
+                    "Net cash (used in) operating activities",
+                    "Operating Cash Flow", 
+                    'NetCashProvidedByUsedInOperatingActivities'
+                ]
+                for k in ocf_lbl:
+                    ocf_test = get_value(cashflow_df, k, q_col)
+                    if ocf_test is not None and pd.notna(ocf_test):
+                        ocf = ocf_test
+                        break
 
                 # SBC
-                sbc_annual = None
-                sbc_row = income_df[income_df['label'].str.contains(
-                    'Share.?Based|Stock.?Based|Compensation', case=False, na=False, regex=True)]
-                if not sbc_row.empty:
-                    try:
-                        sbc_q = sbc_row[q_col].iloc[0]
-                        if pd.notna(sbc_q):
-                            sbc_annual = sbc_q * 4
-                    except KeyError:
-                        sbc_annual = None
+                for lbl in ["ShareBasedCompensation", "Share-based Payment Arrangement, Noncash Expense",
+                "Share-based Payment Arrangement, Expensed and Capitalized, Amount", "Stock Based Compensation"]:
+                        try:
+                            val2 = cashflow_df.loc[lbl, q_col].item()
+                            if val2 is not None:
+                                sbc_q = val2
+                                break
+                        except (KeyError, IndexError):
+                                    continue
 
                 # Capex
                 capex = None
-                capex_row = cashflow_df[cashflow_df['label'].str.contains(
-                    'Capital|PaymentsToAcquireProperty|Equipment', case=False, na=False, regex=True)]
-                if not capex_row.empty:
-                    try:
-                        capex_q = capex_row[q_col].iloc[0]
-                        if pd.notna(capex_q):
-                            capex = capex_q * 4
-                    except KeyError:
-                        capex = None
-
+                capex_labels = [
+                    "Capital Expenditure",
+                    "Capital Expenditures",
+                    "Payments to Acquire Property, Plant, and Equipment",
+                    "PaymentsToAcquirePropertyPlantAndEquipment",
+                    "CapitalExpendituresIncurredButNotYetPaid"
+                ]
+                for j in capex_labels:
+                                try:
+                                    capex_temp = cashflow_df.loc[j, q_col].item()
+                                    if capex_temp is not None:
+                                            capex = capex_temp
+                                            break
+                                except (KeyError, IndexError):
+                                    continue
+                
+                # Compute YoY growth streak
+                if streak_alive:
+                    if revenue_latest is not None and revenue_prev is not None and revenue_prev > 0:
+                        if revenue_latest > revenue_prev:
+                            yoy_growth_streak += 1
+                        else:
+                            streak_alive = False
+                    else:
+                        streak_alive = False
                 # --- Component scoring ---
                 components = []
 
@@ -187,8 +203,8 @@ for index, row in df_ed.iterrows():
                 else:
                     components.append(2)
 
-                if sbc_annual is not None and revenue_latest is not None and revenue_latest > 0:
-                    sbc_pct = round((sbc_annual / 4) / revenue_latest * 100, 2)
+                if sbc_q is not None and revenue_latest is not None and revenue_latest > 0:
+                    sbc_pct = round((sbc_q / revenue_latest) * 100, 2)
                     sbc_pcts.append(sbc_pct)
                     if sbc_pct < 1.5:
                         components.append(3)
@@ -214,8 +230,7 @@ for index, row in df_ed.iterrows():
                     components.append(2)
 
                 if capex is not None:
-                    capex_qtr = capex / 4
-                    fcf = ocf - capex_qtr if ocf is not None else None
+                    fcf = ocf + capex if ocf is not None else None
                     fcf_pos = 1 if (fcf is not None and fcf > 0) else 0
                     if fcf_pos == 1:
                         components.append(3)
@@ -268,7 +283,7 @@ for index, row in df_ed.iterrows():
             continue
 
         print(f"{ticker}: Historical earnings quality: {quality}")
-        print(f"gm change avg ={avg_gm}, sbc avg ={avg_sbc}, ocf/ni avg = {avg_ocf}, fcf pos={fcf_pos_count}")
+        print(f"gm change avg ={avg_gm}, sbc avg ={avg_sbc}, ocf/ni avg = {avg_ocf}, fcf pos={fcf_pos_count}, rev YoY streak = {yoy_growth_streak}")
 
     except Exception as e:
         print(f"{ticker}: unexpected error – {e}")
@@ -290,6 +305,9 @@ for index, row in df_ed.iterrows():
     if hist_score is not None:
         c.execute("UPDATE features SET hist_earnings_quality = ? WHERE ticker = ? AND earnings_date = ?",
                   (hist_score, ticker, ed_clean.strftime("%Y-%m-%d")))
+    if yoy_growth_streak is not None:
+        c.execute("UPDATE features SET revenue_growth_streak = ? WHERE ticker = ? AND earnings_date = ?",
+          (yoy_growth_streak, ticker, ed_clean.strftime("%Y-%m-%d")))
     conn.commit()
 
 conn.close()

@@ -86,12 +86,15 @@ for index,row in df_ed.iterrows():
     else:
         print("Bearish")
 
-    if put_call_skew <= 1.5:
-        print("Pass\n")
-    elif 1.5 < call_put_vol <= 2.0:
-        print("Reduce conviction\n")
+    if put_call_skew is not None:
+        if put_call_skew <= 1.5:
+            print("Pass\n")
+        elif 1.5 < put_call_skew <= 2.0:
+            print("Reduce conviction\n")
+        else:
+            print("Skip trade\n")
     else:
-        print("Skip trade\n")
+        print("Skew data unavailable\n")
     c.execute("UPDATE features SET call_put_volume_ratio = ? WHERE ticker = ? AND earnings_date = ?",
           (float(call_put_vol), ticker, ed_clean.strftime("%Y-%m-%d")))
     c.execute("UPDATE features SET put_call_price_skew = ? WHERE ticker = ? AND earnings_date = ?",

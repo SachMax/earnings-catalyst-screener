@@ -54,9 +54,16 @@ for index,row in df_ed.iterrows():
             continue
 
         try:
-            stock = yf.Ticker(ticker)
-            earnings_hist = stock.earnings_dates
-            time.sleep(1.8)
+            for attempt in range(3):
+                try:
+                    stock = yf.Ticker(ticker)
+                    earnings_hist = stock.earnings_dates
+                    break
+                except Exception:
+                    time.sleep(2)
+            else:
+                print(f"{ticker}: yfinance timed out after retries")
+                continue
             if earnings_hist.empty or earnings_hist is None:
                 print(f"{ticker}: no earnings history data, skipping")
                 continue

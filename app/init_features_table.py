@@ -11,8 +11,9 @@ CREATE TABLE IF NOT EXISTS features (
     -- Trifecta Core (Filters 1 to 4)
     eps_beat INTEGER,
     revenue_growth_YoY INTEGER, 
+    revenue_growth_streak INTEGER,
     revenue_beat INTEGER,                      -- Filter 2 (to be added soon)
-    guidance_valid INTEGER,                      -- Filter 3 (to be added soon)
+    guidance_valid INTEGER,                     
     gaap_profit INTEGER,
     sbc_pct_revenue REAL,
     gaap_clean INTEGER,                          -- derived: gaap_profit AND sbc<3%

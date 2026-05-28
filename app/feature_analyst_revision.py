@@ -85,17 +85,19 @@ for index,row in df_ed.iterrows():
                 upgrade_count = None
                 downgrade_count = None
                 breadth = 0.5
-            
-            if net_revision_count_60d > 3 and breadth > 0.7:
-                label = "Strong Positive"
-            elif net_revision_count_60d > 0:
-                label = "Positive"
-            elif net_revision_count_60d == 0:
-                label = "Neutral"
-            elif net_revision_count_60d < 0 and breadth < 0.3:
-                label = "Strong Negative"
+            if net_revision_count_60d is not None:
+                if net_revision_count_60d > 3 and breadth > 0.7:
+                    label = "Strong Positive"
+                elif net_revision_count_60d > 0:
+                    label = "Positive"
+                elif net_revision_count_60d == 0:
+                    label = "Neutral"
+                elif net_revision_count_60d < 0 and breadth < 0.3:
+                    label = "Strong Negative"
+                else:
+                    label = "Negative"
             else:
-                label = "Negative"
+                label = "No Revision Data"
 
             earnings = stock.earnings_dates
             revision_pct = None

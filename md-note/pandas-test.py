@@ -1,3 +1,3 @@
-import os
-
-print(os.listdir("C:\\Users\Sachio\\OneDrive\\Desktop\\earnings-catalyst-screener\\app"))
+import numpy as np
+rng = np.random.default_rng()
+print(rng.integers(low=1, high=7, size = 3))

@@ -36,6 +36,7 @@ for index,row in df_ed.iterrows():
         if df.empty:
             print(f"{ticker}: no price data, skipping")
             continue
+        
         for attempt in range(3):
             try:
                 stock = yf.Ticker(ticker)

@@ -30,6 +30,10 @@ def get_close(df, target):
 
 for index,row in df_ed.iterrows(): 
     ticker = row['ticker']
+
+    if ticker != 'PEP':
+        continue
+
     ed_clean = row['earnings_date'].date()
     df_price = pd.read_sql(f"SELECT * FROM price_history WHERE ticker='{ticker}' ORDER BY date", conn, parse_dates='date', index_col='date')
 

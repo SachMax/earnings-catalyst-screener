@@ -2,7 +2,6 @@ import sqlite3
 import pandas as pd
 from datetime import date, timedelta
 import yfinance as yf
-import numpy as np
 import time
 
 conn = sqlite3.connect('data/universe.db')

@@ -38,7 +38,8 @@ for index, row in df_ed.iterrows():
         continue
 
     try:
-        before = df.loc[:ed_clean].iloc[-1]
+        ed_clean_ts = pd.Timestamp(ed_clean)
+        before = df.loc[:ed_clean_ts].iloc[-1]
         close_before = before['close_price']
     except (KeyError, IndexError):
         print(f"{ticker}: no price on or before {ed_clean}")

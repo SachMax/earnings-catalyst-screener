@@ -18,8 +18,15 @@ c.execute("""
     )
 """)
 
+c.execute("""
+    DELETE FROM earnings_calendar
+    WHERE earnings_date < date('now')
+       OR earnings_date > date('now', '+7 days')
+""")
+conn.commit()
+
 today = date.today()
-cutoff_days = 14          # ← change this to whatever window you want
+cutoff_days = 7         # ← change this to whatever window you want
 cutoff = today + timedelta(days=cutoff_days)
 
 # Read the full US stock list

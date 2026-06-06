@@ -78,6 +78,12 @@ plt.show()
 ```
 ![alt text](image-8.png)
 
+
+### Walk-forward CV (`.TimeSeriesSplit()`)
+the pattern looks like this:
+- Round 1: Train on [Oldest] → Test on [1st New One]
+- Round 2: Train on [Oldest + 1st New One] → Test on [2nd New One]
+- Round 3: Train on [Oldest + 1st New One + 2nd New One] → Test on [3rd New One]
 ---
 ---
 

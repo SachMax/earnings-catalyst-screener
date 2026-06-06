@@ -414,9 +414,9 @@ def historical_earnings_quality(ticker, as_of_date):
                     "Share-based Payment Arrangement, Expensed and Capitalized, Amount",
                     "Stock Based Compensation"]:
             try:
-                val = cashflow_df.loc[lbl, cf_q_col].item()
-                if val is not None:
-                    sbc_q = val
+                raw1 = cashflow_df.loc[lbl, cf_q_col]
+                if raw1 is not None:
+                    sbc_q = raw1.item() if hasattr(raw1, 'item') else raw1
                     break
             except (KeyError, IndexError):
                 continue
@@ -428,9 +428,9 @@ def historical_earnings_quality(ticker, as_of_date):
                     "PaymentsToAcquirePropertyPlantAndEquipment",
                     "CapitalExpendituresIncurredButNotYetPaid"]:
             try:
-                val = cashflow_df.loc[lbl, cf_q_col].item()
+                val = cashflow_df.loc[lbl, cf_q_col]
                 if val is not None:
-                    capex = val
+                    capex = val.item() if hasattr(val, 'item') else val
                     break
             except (KeyError, IndexError):
                 continue
@@ -797,9 +797,9 @@ def current_earnings_quality(ticker, as_of_date):
                     "Share-based Payment Arrangement, Expensed and Capitalized, Amount",
                     "Stock Based Compensation"]:
             try:
-                val = cashflow_df.loc[lbl, cf_latest_q].item()
+                val = cashflow_df.loc[lbl, cf_latest_q]
                 if val is not None:
-                    sbc_q = val
+                    sbc_q = val.item() if hasattr(val, 'item') else val
                     break
             except (KeyError, IndexError):
                 continue
@@ -809,9 +809,9 @@ def current_earnings_quality(ticker, as_of_date):
                     "PaymentsToAcquirePropertyPlantAndEquipment",
                     "CapitalExpendituresIncurredButNotYetPaid"]:
             try:
-                val = cashflow_df.loc[lbl, cf_latest_q].item()
-                if val is not None:
-                    capex = val
+                raw = cashflow_df.loc[lbl, cf_latest_q]
+                if raw is not None:
+                    capex = raw.item() if hasattr(raw, 'item') else raw
                     break
             except (KeyError, IndexError):
                 continue
@@ -994,7 +994,7 @@ def compute_volume_ratio(ticker, as_of_date, df_price):
     post_vol = df_price['volume'].iloc[idx]
 
     past_vol = df_price.loc[:pd.Timestamp(as_of_date)].tail(20)['volume'].mean() #slicing only up to earnings_date
-    if pd.isna(post_vol) or pd.isna(past_vol):
+    if pd.isna(post_vol) or pd.isna(past_vol) or past_vol == 0:
         print(f"{ticker}: not enough data")
         return None
 

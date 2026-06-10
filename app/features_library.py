@@ -76,19 +76,11 @@ import sqlite3
 import pandas as pd
 from datetime import date, timedelta
 import numpy as np
-import time
 import edgar
 import logging
 logging.getLogger("edgar").setLevel(logging.ERROR)
 
 edgar.set_identity("sachiomaximilliano166@gmail.com")
-
-def analyst_consensus(ticker):
-    import yfinance as yf
-
-    stock = yf.Ticker(ticker)
-    consensus = stock.info.get('recommendationKey', None)
-    return consensus
 
 def analyst_momentum(ticker, as_of_date):
     import yfinance as yf
@@ -108,12 +100,27 @@ def analyst_momentum(ticker, as_of_date):
     try:
         stock = yf.Ticker(ticker)
         downgrades = stock.upgrades_downgrades
-        if downgrades is None or downgrades.empty:
+        
+        # 1. Check if the historical dataframe itself exists and contains data
+        has_history = downgrades is not None and not downgrades.empty
+        
+        # 2. Check if a general consensus mean exists in stock.info
+        # (Some stocks have historical logs but no active mean, or vice versa)
+        info_dict = stock.info if hasattr(stock, 'info') else {}
+        rec_mean = info_dict.get("recommendationMean")
+        has_mean = rec_mean is not None
+        
+        # 3. Calculate the coverage flag (1 if either indicator proves Wall Street looks at it, else 0)
+        has_analyst_coverage = 1 if (has_history or has_mean) else 0
+
+        # Scenario A: The API works, but there is absolutely no analyst history
+        if not has_history:
             return {
-                'recommendation_mean': None,
-                'upgrade_count': 0,
-                'downgrade_count': 0,
-                'net_analyst_momentum': 0
+                "recommendation_mean": rec_mean,
+                "upgrade_count": 0,
+                "downgrade_count": 0,
+                "net_analyst_momentum": 0,
+                "has_analyst_coverage": has_analyst_coverage,  # Will be 0 (or 1 if only mean exists)
             }
 
         # The index can be a DatetimeIndex or a plain integer index.
@@ -129,14 +136,15 @@ def analyst_momentum(ticker, as_of_date):
             else:
                 # No date column – return neutral
                 return {
-                    'recommendation_mean': None,
+                    'recommendation_mean': rec_mean,
                     'upgrade_count': 0,
                     'downgrade_count': 0,
-                    'net_analyst_momentum': 0
+                    'net_analyst_momentum': 0,
+                    "has_analyst_coverage": has_analyst_coverage
                 }
 
         last2weeks = pd.Timestamp(as_of_date) - timedelta(days=14)
-        mask = (date_series >= last2weeks) & (date_series <= pd.Timestamp(as_of_date))
+        mask = (date_series >= last2weeks) & (date_series < pd.Timestamp(as_of_date))
         recent = downgrades[mask]
 
         upgrade_count = 0
@@ -151,17 +159,20 @@ def analyst_momentum(ticker, as_of_date):
 
         net = upgrade_count - downgrade_count
         return {
-            'recommendation_mean': stock.info.get('recommendationMean', None),
+            'recommendation_mean': rec_mean,
             'upgrade_count': upgrade_count,
             'downgrade_count': downgrade_count,
-            'net_analyst_momentum': net
+            'net_analyst_momentum': net,
+            "has_analyst_coverage": has_analyst_coverage
         }
+    
     except Exception:
         return {
             'recommendation_mean': None,
-            'upgrade_count': 0,
-            'downgrade_count': 0,
-            'net_analyst_momentum': 0
+            'upgrade_count': None,
+            'downgrade_count': None,
+            'net_analyst_momentum': None,
+            "has_analyst_coverage": None
         }
 
 def analyst_consensus(ticker, as_of_date):
@@ -182,69 +193,96 @@ def analyst_revision(ticker, as_of_date):
         elif grade_lower in ['sell','underperform','underweight']:
             return 0   # bearish
         return 1  # unknown -> treat as neutral
-
-    stock = yf.Ticker(ticker)
-    downgrades = stock.upgrades_downgrades
-    last60days = pd.Timestamp(as_of_date) - timedelta(days=60)
-    mask = (downgrades.index >= last60days) & (downgrades.index <= pd.Timestamp(as_of_date))
-    recent = downgrades[mask]
-    downgrade_count = 0
-    upgrade_count = 0
-    breadth = None
-    net_revision_count_60d = None
-    label = None
-    for _, rrow in recent.iterrows():
-        grade_from = rating_tier(rrow.get('FromGrade', ''))
-        grade_to = rating_tier(rrow.get('ToGrade', ''))
-        if grade_to < grade_from:
-            downgrade_count += 1
-        if grade_to > grade_from:
-            upgrade_count += 1
-    if downgrade_count and upgrade_count:
-        net_revision_count_60d = upgrade_count - downgrade_count
-        breadth = upgrade_count / (upgrade_count + downgrade_count)
-    else:
-        upgrade_count = None
-        downgrade_count = None
-        breadth = 0.5
-    if net_revision_count_60d is not None:
-        if net_revision_count_60d > 3 and breadth > 0.7:
-            label = "Strong Positive"
-        elif net_revision_count_60d > 0:
-            label = "Positive"
-        elif net_revision_count_60d == 0:
-            label = "Neutral"
-        elif net_revision_count_60d < 0 and breadth < 0.3:
-            label = "Strong Negative"
+    try:
+        stock = yf.Ticker(ticker)
+        downgrades = stock.upgrades_downgrades
+        if downgrades is None or downgrades.empty:
+            return {
+                "upward_revision_count60d": None,
+                "downward_revision_count60d": None,
+                "net_revision_count_60d": None,
+                "revision_breadth_60d": 0.5,
+                "revision_trend_label": None,
+                "estimate_revision_pct": None,
+            }
+        if not pd.api.types.is_datetime64_any_dtype(downgrades.index):
+            return {
+                "upward_revision_count60d": None,
+                "downward_revision_count60d": None,
+                "net_revision_count_60d": None,
+                "revision_breadth_60d": 0.5,
+                "revision_trend_label": None,
+                "estimate_revision_pct": None,
+            }
+        last60days = pd.Timestamp(as_of_date) - timedelta(days=60)
+        mask = (downgrades.index >= last60days) & (downgrades.index < pd.Timestamp(as_of_date))
+        recent = downgrades[mask]
+        downgrade_count = 0
+        upgrade_count = 0
+        breadth = None
+        net_revision_count_60d = None
+        label = None
+        for _, rrow in recent.iterrows():
+            grade_from = rating_tier(rrow.get('FromGrade', ''))
+            grade_to = rating_tier(rrow.get('ToGrade', ''))
+            if grade_to < grade_from:
+                downgrade_count += 1
+            if grade_to > grade_from:
+                upgrade_count += 1
+        if downgrade_count and upgrade_count:
+            net_revision_count_60d = upgrade_count - downgrade_count
+            breadth = upgrade_count / (upgrade_count + downgrade_count)
         else:
-            label = "Negative"
-    else:
-        label = "No Revision Data"
+            upgrade_count = None
+            downgrade_count = None
+            breadth = 0.5
+        if net_revision_count_60d is not None:
+            if net_revision_count_60d > 3 and breadth > 0.7:
+                label = "Strong Positive"
+            elif net_revision_count_60d > 0:
+                label = "Positive"
+            elif net_revision_count_60d == 0:
+                label = "Neutral"
+            elif net_revision_count_60d < 0 and breadth < 0.3:
+                label = "Strong Negative"
+            else:
+                label = "Negative"
+        else:
+            label = "No Revision Data"
 
-    earnings = stock.earnings_dates
-    revision_pct = None
-    if earnings is not None and not earnings.empty:
-        # Sort descending so most recent quarters are first
-        earnings_sorted = earnings.sort_index(ascending=False)
-        # Upcoming quarter: no reported EPS yet
-        upcoming = earnings_sorted[earnings_sorted['Reported EPS'].isna()].head(1)
-        if not upcoming.empty:
-            current_est = upcoming['EPS Estimate'].iloc[0]
-            # Most recently completed quarter: has a reported EPS
-            completed = earnings_sorted[earnings_sorted['Reported EPS'].notna()].head(1)
-            if not completed.empty:
-                prev_est = completed['EPS Estimate'].iloc[0]   # final estimate for that quarter
-                if pd.notna(current_est) and pd.notna(prev_est) and prev_est != 0:
-                    revision_pct = round((current_est - prev_est) / abs(prev_est) * 100, 2)
-    dictionary = {
-        'upward_revision_count60d': upgrade_count,
-        'downward_revision_count60d': downgrade_count,
-        'net_revision_count_60d': net_revision_count_60d,
-        'revision_breadth_60d': breadth,
-        'revision_trend_label': label,
-        'estimate_revision_pct': revision_pct
-    }
-    return dictionary
+        earnings = stock.earnings_dates
+        revision_pct = None
+        if earnings is not None and not earnings.empty:
+            # Sort descending so most recent quarters are first
+            earnings_sorted = earnings.sort_index(ascending=False)
+            # Upcoming quarter: no reported EPS yet
+            upcoming = earnings_sorted[earnings_sorted['Reported EPS'].isna()].head(1)
+            if not upcoming.empty:
+                current_est = upcoming['EPS Estimate'].iloc[0]
+                # Most recently completed quarter: has a reported EPS
+                completed = earnings_sorted[earnings_sorted['Reported EPS'].notna()].head(1)
+                if not completed.empty:
+                    prev_est = completed['EPS Estimate'].iloc[0]   # final estimate for that quarter
+                    if pd.notna(current_est) and pd.notna(prev_est) and prev_est != 0:
+                        revision_pct = round((current_est - prev_est) / abs(prev_est) * 100, 2)
+        dictionary = {
+            'upward_revision_count60d': upgrade_count,
+            'downward_revision_count60d': downgrade_count,
+            'net_revision_count_60d': net_revision_count_60d,
+            'revision_breadth_60d': breadth,
+            'revision_trend_label': label,
+            'estimate_revision_pct': revision_pct
+        }
+        return dictionary
+    except Exception:
+        return {
+                "upward_revision_count60d": None,
+                "downward_revision_count60d": None,
+                "net_revision_count_60d": None,
+                "revision_breadth_60d": 0.5,
+                "revision_trend_label": None,
+                "estimate_revision_pct": None,
+            }
 
 def historical_earnings_quality(ticker, as_of_date):
     """
@@ -544,7 +582,7 @@ def historical_earnings_quality(ticker, as_of_date):
         etf_return = None
         try:
             start_dl = as_of_date - timedelta(days=12)
-            xlk = yf.download('XLK', start=start_dl, end=as_of_date, progress=False)
+            xlk = yf.download('XLK', start=start_dl, end=as_of_date - timedelta(days=1), progress=False)
             if len(xlk) >= 2:
                 xlk = xlk.tail(5)
                 etf_return = ((xlk['Close'].iloc[-1] / xlk['Close'].iloc[0] - 1) * 100).item()
@@ -565,7 +603,7 @@ def historical_earnings_quality(ticker, as_of_date):
             # reuse the 'stock' object from line 16 (no need to create another one)
             downgrades = stock.upgrades_downgrades
             last14 = pd.Timestamp(as_of_date) - timedelta(days=14)
-            mask = (downgrades.index >= last14) & (downgrades.index <= pd.Timestamp(as_of_date))
+            mask = (downgrades.index >= last14) & (downgrades.index < pd.Timestamp(as_of_date))
             recent = downgrades[mask]
             for _, rrow in recent.iterrows():
                 fr = rating_tier(rrow.get('FromGrade', ''))
@@ -656,7 +694,7 @@ def current_earnings_quality(ticker, as_of_date):
         stock = yf.Ticker(ticker)
         ed = stock.earnings_dates
         if ed is not None and not ed.empty:
-            reported = ed[(ed['Reported EPS'].notna()) & (ed.index <= pd.Timestamp(as_of_date))]
+            reported = ed[(ed['Reported EPS'].notna()) & (ed.index < pd.Timestamp(as_of_date))]
             if not reported.empty:
                 latest = reported.sort_index(ascending=False).iloc[0]
                 surprise = latest.get('Surprise(%)')
@@ -772,6 +810,20 @@ def current_earnings_quality(ticker, as_of_date):
     if eps_beat is None:
         if eps_latest is not None and eps_prev is not None and eps_prev != 0:
             eps_beat = 1 if eps_latest > eps_prev else 0
+    # EPS surprise percentage (continuous)
+    eps_surprise_pct = None
+    if 'latest' in dir() and latest is not None:
+        surprise_val = latest.get('Surprise(%)')
+        if surprise_val is not None and pd.notna(surprise_val):
+            eps_surprise_pct = surprise_val
+    # Fallback: YoY EPS growth from EDGAR
+    if eps_surprise_pct is None and eps_latest is not None and eps_prev is not None and eps_prev != 0:
+        eps_surprise_pct = round(((eps_latest - eps_prev) / abs(eps_prev)) * 100, 2)
+
+    # Revenue surprise (continuous YoY growth proxy)
+    revenue_surprise_pct = None
+    if revenue_latest is not None and revenue_prev is not None and revenue_prev > 0:
+        revenue_surprise_pct = round(((revenue_latest - revenue_prev) / revenue_prev) * 100, 2)
 
     # ---------------- 4. cash flow items ----------------
     cf_latest_q = valid_cf_cols[0] if valid_cf_cols else None
@@ -822,8 +874,8 @@ def current_earnings_quality(ticker, as_of_date):
             stock = yf.Ticker(ticker)
             q_income = stock.quarterly_financials
             q_cashflow = stock.quarterly_cashflow
-            valid_inc = [c for c in q_income.columns if c.date() <= as_of_date]
-            valid_cf  = [c for c in q_cashflow.columns if c.date() <= as_of_date]
+            valid_inc = [c for c in q_income.columns if c.date() < as_of_date]
+            valid_cf  = [c for c in q_cashflow.columns if c.date() < as_of_date]
             if valid_inc:
                 latest_inc = sorted(valid_inc)[-1]
                 if 'Total Revenue' in q_income.index:
@@ -924,7 +976,7 @@ def current_earnings_quality(ticker, as_of_date):
 
     revenue_beat = 1 if (revenue_latest is not None and revenue_prev is not None and
                          revenue_prev > 0 and revenue_latest > revenue_prev) else 0
-
+    
     return {
         'quality': quality,
         'score': score,
@@ -936,7 +988,9 @@ def current_earnings_quality(ticker, as_of_date):
         'fcf_positive': fcf_positive,
         'revenue_beat': revenue_beat,
         'eps_beat': eps_beat,
-        'gaap_profit': gaap_profit
+        'gaap_profit': gaap_profit,
+        'eps_surprise_pct': eps_surprise_pct,
+        'revenue_surprise_pct': revenue_surprise_pct
     }
 
 def load_price_history(ticker):
@@ -976,29 +1030,34 @@ def compute_rsi(ticker, as_of_date, df_price):
     RS = avg_gain / avg_loss
     RSI = 100 - (100 / (1 + RS))
     # Get the last RSI value on or before as_of_date
-    rsi_series = RSI.loc[:pd.Timestamp(as_of_date)]
+    rsi_series = RSI.loc[:pd.Timestamp(as_of_date - timedelta(days=1))]
     if rsi_series.empty:
         return None
-    latest_rsi = rsi_series.iloc[-1]
+    latest_rsi = round(rsi_series.iloc[-1], 2)
     if pd.isna(latest_rsi):
         return None
     return round(latest_rsi, 2)
 
 def compute_volume_ratio(ticker, as_of_date, df_price):
-    if df_price.empty: 
-        print(f"no data in {ticker}, skipping...")
+    if df_price.empty:
         return None
 
-    target_date = pd.Timestamp(as_of_date) + timedelta(days=1)
-    idx = df_price.index.get_indexer([target_date], method= "ffill")[0]
-    post_vol = df_price['volume'].iloc[idx]
+    # Use only data up to the day BEFORE the announcement (strictly pre‑announcement)
+    pre_data = df_price.loc[:pd.Timestamp(as_of_date - timedelta(days=1))]
 
-    past_vol = df_price.loc[:pd.Timestamp(as_of_date)].tail(20)['volume'].mean() #slicing only up to earnings_date
-    if pd.isna(post_vol) or pd.isna(past_vol) or past_vol == 0:
-        print(f"{ticker}: not enough data")
+    if len(pre_data) < 21:   # need at least 21 rows to get 20 prior days + yesterday
         return None
 
-    ratio = float(round(post_vol / past_vol, 2))
+    # Volume on the most recent day (which is the day before the announcement)
+    yesterday_vol = pre_data['volume'].iloc[-1]
+
+    # Average volume over the 20 days prior to that (i.e., the 20 days ending the day before)
+    avg_20_vol = pre_data['volume'].iloc[-21:-1].mean()   # rows from -21 to -2 (20 rows)
+
+    if avg_20_vol == 0 or pd.isna(yesterday_vol) or pd.isna(avg_20_vol):
+        return None
+
+    ratio = round(yesterday_vol / avg_20_vol, 2)
     return ratio
 
 def load_earnings_dates(ticker):
@@ -1027,7 +1086,7 @@ def compute_past_earnings_action(ticker, as_of_date, df_price, df_ed):
 
     # Past earnings dates ≤ as_of_date
     earnings_hist = df_ed
-    past = earnings_hist[earnings_hist <= pd.Timestamp(as_of_date)]
+    past = earnings_hist[earnings_hist < pd.Timestamp(as_of_date)]
     if len(past) < 2:
         return None
 
@@ -1147,19 +1206,22 @@ def compute_past_earnings_action(ticker, as_of_date, df_price, df_ed):
         'post_earnings_drift': avg_drift
     }
     
-def compute_guidance_valid(ticker, as_of_date):
-    """Return 1 if guidance was raised, 0 if affirmed, None if no guidance found."""
-    import edgar, pandas as pd
-    from datetime import timedelta
+def compute_prior_guidance_raised(ticker, as_of_date):
 
+    # 1. Find the most recent earnings date before as_of_date
+    ed_series = load_earnings_dates(ticker)   # your existing function
+    past_dates = ed_series[ed_series < pd.Timestamp(as_of_date)]
+    if past_dates.empty:
+        return None
+    prior_date = past_dates.sort_values(ascending=False).iloc[0].date()
+
+    # 2. Fetch the 8‑K from that prior date
     try:
         company = edgar.Company(ticker)
-        start = as_of_date - timedelta(days=4)
-        end   = as_of_date + timedelta(days=4)
-        filings = company.get_filings(form="8-K", filing_date=f"{start}:{end}")
+        filings = company.get_filings(form="8-K",
+                                      filing_date=f"{prior_date}:{prior_date}")
     except:
         return None
-
     # ---- helpers for keyword scan ----
     def has_item(filing, item_code):
         if filing.items is None:
@@ -1227,7 +1289,7 @@ def compute_guidance_valid(ticker, as_of_date):
 
     return None
 
-def compute_sector_relative_strength(ticker, as_of_date):
+def compute_sector_relative_strength(ticker, as_of_date, df_price):
     """Return sector‑relative strength (sector ETF - SPY return) over 20 trading days."""
     import yfinance as yf
     import pandas as pd
@@ -1247,6 +1309,10 @@ def compute_sector_relative_strength(ticker, as_of_date):
         "Consumer Staples": "XLP"
     }
     stock = yf.Ticker(ticker)
+    if df_price.empty:
+        return None
+    pre_data = df_price.loc[:pd.Timestamp(as_of_date - timedelta(days=1))]
+
     sector = stock.info.get('sector', None)
     etf = sector_to_etf.get(sector)
     if etf is None:
@@ -1254,19 +1320,25 @@ def compute_sector_relative_strength(ticker, as_of_date):
 
     try:
         start = as_of_date - pd.offsets.BDay(20)
-        xlk = yf.download(etf, start=start, end=as_of_date, progress=False)
-        spy = yf.download('SPY', start=start, end=as_of_date, progress=False)
+        xlk = yf.download(etf, start=start, end=(as_of_date - timedelta(days=1)), progress=False)
+        spy = yf.download('SPY', start=start, end=(as_of_date - timedelta(days=1)), progress=False)
+        pre = pre_data[pre_data >= start]
 
         if xlk.empty or spy.empty or len(xlk) < 2 or len(spy) < 2:
             return None
 
-        sect_ret = (xlk['Close'].iloc[-1] / xlk['Close'].iloc[0] - 1) * 100
+        sector_ret = (xlk['Close'].iloc[-1] / xlk['Close'].iloc[0] - 1) * 100
         spy_ret  = (spy['Close'].iloc[-1] / spy['Close'].iloc[0] - 1) * 100
-
+        stock_ret = (pre['close_price'].iloc[-1]/ pre['close_price'].iloc[0] - 1) * 100
         # Force plain float and round
-        sect_ret = float(sect_ret)
+        sector_ret = float(sector_ret)
         spy_ret = float(spy_ret)
-        return round(sect_ret - spy_ret, 2)
+        stock_ret = float(stock_ret)
+        return {
+                "stock_vs_spy_20d": round(float(stock_ret - spy_ret), 2) if spy_ret is not None else None,
+                "stock_vs_sector_20d": round(float(stock_ret - sector_ret), 2) if sector_ret is not None else None,
+                "sector_spy_return_ratio": round(sector_ret - spy_ret, 2)
+            }
     except:
         return None
     
@@ -1283,7 +1355,7 @@ def compute_sue(ticker, as_of_date):
             return None
 
         # Filter to quarters before as_of_date that have a reported EPS
-        reported = ed[(ed['Reported EPS'].notna()) & (ed.index <= pd.Timestamp(as_of_date))]
+        reported = ed[(ed['Reported EPS'].notna()) & (ed.index < pd.Timestamp(as_of_date))]
         if reported.empty:
             return None
 
@@ -1370,8 +1442,8 @@ def compute_seasonality_match(ticker, as_of_date, df_price, ed_series):
     return 1 if current_sign == hist_sign else 0
 
 def compute_insider_transactions(ticker, as_of_date, max_filings=50):
-
     import edgar
+    import datetime
 
     try:
         company = edgar.Company(ticker)
@@ -1386,8 +1458,16 @@ def compute_insider_transactions(ticker, as_of_date, max_filings=50):
     filing_count = 0
 
     for f in form4s:
-        if f.filing_date.date() > as_of_date:
+        # Robust handling: filing_date may be date or datetime
+        filing_dt = f.filing_date
+        if isinstance(filing_dt, datetime.datetime):
+            filing_date = filing_dt.date()
+        else:
+            filing_date = filing_dt   # already a datetime.date
+
+        if filing_date >= as_of_date:
             continue   # skip future filings
+
         try:
             ownership = f.obj()
             summary = ownership.get_ownership_summary()
@@ -1456,11 +1536,12 @@ def get_market_context(as_of_date):
     import pandas as pd
 
     try:
-        start = as_of_date - pd.Timedelta(days=5)
-        end   = as_of_date
+        # Use market data strictly before the announcement
+        end_date = as_of_date - pd.Timedelta(days=1)
+        start_date = end_date - pd.Timedelta(days=5)
 
-        vix = yf.download('^VIX', start=start, end=end, progress=False)
-        oil = yf.download('CL=F', start=start, end=end, progress=False)
+        vix = yf.download('^VIX', start=start_date, end=end_date, progress=False)
+        oil = yf.download('CL=F', start=start_date, end=end_date, progress=False)
 
         vix_level = None
         oil_move = None
@@ -1481,23 +1562,179 @@ def get_market_context(as_of_date):
 def compute_pct_from_52wlow(ticker, as_of_date, df_price):
     if df_price.empty:
         return None
-    df_window = df_price.loc[:pd.Timestamp(as_of_date)].tail(260) # 52 * 5 = 260
-    if len(df_window) < 100:   # not enough history
-        pct = None
-    else:
-        high_52w = df_window['close_price'].max()
-        low_52w = df_window['close_price'].min()
-        current_price = df_window['close_price'].iloc[-1]
-        if high_52w != low_52w:
-            pct = ((current_price - low_52w) / (high_52w - low_52w)) * 100
-            pct = round(pct, 2)
+
+    # Use prices strictly before the announcement
+    pre_data = df_price.loc[:pd.Timestamp(as_of_date - timedelta(days=1))]
+
+    if len(pre_data) < 100:   # not enough history
+        return None
+
+    df_window = pre_data.tail(260)   # roughly one year of trading days
+    high_52w = df_window['close_price'].max()
+    low_52w = df_window['close_price'].min()
+    current_price = df_window['close_price'].iloc[-1]
+
+    if high_52w == low_52w:
+        return None
+
+    pct = ((current_price - low_52w) / (high_52w - low_52w)) * 100
+    return round(pct, 2)
+
+def compute_market_cap_features(ticker, as_of_date, df_price):
+    """
+    Returns:
+    {
+        'market_cap_bucket': bucket,
+        'log_market_cap': log_market_cap
+    }
+    """
+    try:
+        stock = yf.Ticker(ticker)
+        shares = stock.info.get("sharesOutstanding")
+        pre_data = df_price.loc[:pd.Timestamp(as_of_date - timedelta(days=1))]
+        close = pre_data.iloc[-1]["close_price"]
+        if shares is None or pre_data.empty or pd.isna(close):
+            return {
+            "market_cap_bucket": None,
+            "log_market_cap": None
+            }
+        market_cap = close * shares
+        market_cap_bil = market_cap / 1e9
+        if market_cap_bil >= 200:
+            bucket = "mega"
+        elif market_cap_bil >= 50:
+            bucket = "large"
+        elif market_cap_bil >= 10:
+            bucket = "mid"
+        elif market_cap_bil >= 2:
+            bucket = "small"
         else:
-            pct = None
+            bucket = "micro"
+        return {
+            "market_cap_bucket": bucket,
+            "log_market_cap": round(float(np.log1p(market_cap_bil)), 6),
+        }
+    except Exception:
+        return {
+            "market_cap_bucket": None,
+            "log_market_cap": None
+            }
+    
+def compute_sector_industry(ticker):
+    try:
+        stock = yf.Ticker(ticker)
+        info = stock.info
+        return {
+            "sector": info.get("sector"),
+            "industry": info.get("industry"),
+        }
+    except Exception:
+        return {
+            "sector": None,
+            "industry": None
+        }
+    
+def compute_momentum_features(as_of_date, df_price):
+    try:
+        if df_price.empty:
+            return None
+        pre_data = df_price.loc[:pd.Timestamp(as_of_date - timedelta(days=1))]
+        close_now = pre_data.iloc[-1]["close_price"]
+        if pd.isna(close_now):
+            return None
+        out = {}
+        if len(pre_data) >= 21:
+            out["return_20d"] = round((close_now / pre_data.iloc[-21]["close_price"] - 1) * 100, 2)
+        else:
+            out["return_20d"] = None
+        if len(pre_data) >= 61:
+            out["return_60d"] = round((close_now / pre_data.iloc[-61]["close_price"] - 1) * 100, 2)
+        else:
+            out["return_60d"] = None
+        if len(pre_data) >= 121:
+            out["return_120d"] = round((close_now / pre_data.iloc[-121]["close_price"] - 1) * 100, 2)
+        else:
+            out["return_120d"] = None
+        return out
+    except Exception:
+        return {
+        'return_20d': None,
+        'return_60d': None,
+        'return_120d': None
+    }
 
-    return pct
+def compute_volatility_features(as_of_date, df_price):
+    try:
+        if df_price.empty:
+            return None
+        pre_data = df_price.loc[:pd.Timestamp(as_of_date - timedelta(days=1))]
+        if pre_data.empty or len(pre_data) < 21:
+            return None
+        returns = pre_data["close_price"].pct_change().dropna()
+        if returns.empty:
+            return None
+        vol20 = None
+        vol60 = None
+        if len(returns) >= 20:
+            vol20 = returns.tail(20).std() * np.sqrt(252) * 100
+        if len(returns) >= 60:
+            vol60 = returns.tail(60).std() * np.sqrt(252) * 100
+        return {
+            "volatility_20d": round(float(vol20), 2) if vol20 is not None and not pd.isna(vol20) else None,
+            "volatility_60d": round(float(vol60), 2) if vol60 is not None and not pd.isna(vol60) else None,
+        }
+    except Exception:
+        return {
+            "volatility_20d": None,
+            "volatility_60d": None
+        }
 
-def eps_beat(ticker, as_of_date):
-    eps_beat = None
-    curr = current_earnings_quality(ticker, as_of_date)
-    eps_beat = curr['eps_beat'] if curr else None
-    return eps_beat
+def compute_volatility_percentile(ticker, as_of_date, df_price, hist_years=2):
+    if df_price.empty:
+        return None
+    pre_data = df_price.loc[:pd.Timestamp(as_of_date - timedelta(days=1))]
+
+    if pre_data.empty or len(pre_data) < 63:
+        return None
+
+    # Current HV20 (from existing function)
+    current_vol = compute_volatility_features(as_of_date, df_price)
+    if current_vol is None or current_vol.get('volatility_20d') is None:
+        return None
+
+    hv20_current = current_vol['volatility_20d']
+
+    # Build historical distribution of HV20
+    hv20_history = []
+    end_date = as_of_date - timedelta(days=1)
+    start_date = end_date - timedelta(days=hist_years * 365)
+
+    lookback_data = pre_data.loc[start_date:end_date]
+    if len(lookback_data) < 126:
+        return None
+
+    window_start = 0
+    close_prices = lookback_data['close_price']
+    dates = close_prices.index
+    while window_start + 20 <= len(close_prices):   # fixed to <= to capture final window
+        window = close_prices.iloc[window_start:window_start + 20]
+        returns = window.pct_change().dropna()
+        if len(returns) >= 19:
+            vol = returns.std() * np.sqrt(252) * 100
+            if not pd.isna(vol):
+                hv20_history.append(vol)
+        window_start += 5
+
+    if len(hv20_history) < 20:
+        return None
+
+    hv20_history = np.array(hv20_history)
+
+    percentile = (np.sum(hv20_history < hv20_current) / len(hv20_history)) * 100
+    high_vol_regime = 1 if percentile >= 80.0 else 0
+
+    return {
+        'hv20_current': round(hv20_current, 2),
+        'vol_percentile': round(percentile, 2),
+        'high_vol_regime': high_vol_regime
+    }

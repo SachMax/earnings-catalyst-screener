@@ -1293,6 +1293,7 @@ def compute_sector_relative_strength(ticker, as_of_date, df_price):
     """Return sector‑relative strength (sector ETF - SPY return) over 20 trading days."""
     import yfinance as yf
     import pandas as pd
+    import numpy as np
 
     sector_to_etf = {
         "Financial Services": "XLF",
@@ -1322,23 +1323,40 @@ def compute_sector_relative_strength(ticker, as_of_date, df_price):
         start = as_of_date - pd.offsets.BDay(20)
         xlk = yf.download(etf, start=start, end=(as_of_date - timedelta(days=1)), progress=False)
         spy = yf.download('SPY', start=start, end=(as_of_date - timedelta(days=1)), progress=False)
-        pre = pre_data[pre_data >= start]
 
-        if xlk.empty or spy.empty or len(xlk) < 2 or len(spy) < 2:
+        if xlk.empty or spy.empty:
             return None
 
-        sector_ret = (xlk['Close'].iloc[-1] / xlk['Close'].iloc[0] - 1) * 100
-        spy_ret  = (spy['Close'].iloc[-1] / spy['Close'].iloc[0] - 1) * 100
-        stock_ret = (pre['close_price'].iloc[-1]/ pre['close_price'].iloc[0] - 1) * 100
-        # Force plain float and round
-        sector_ret = float(sector_ret)
-        spy_ret = float(spy_ret)
-        stock_ret = float(stock_ret)
+        # Use last valid close (drop NaN)
+        xlk_close = xlk['Close'].dropna()
+        spy_close = spy['Close'].dropna()
+        if len(xlk_close) < 2 or len(spy_close) < 2:
+            return None
+
+        # Get start and end prices (earliest and latest valid)
+        xlk_start = xlk_close.iloc[0]
+        xlk_end = xlk_close.iloc[-1]
+        spy_start = spy_close.iloc[0]
+        spy_end = spy_close.iloc[-1]
+
+        sector_ret = (xlk_end / xlk_start - 1) * 100
+        spy_ret   = (spy_end / spy_start - 1) * 100
+
+        # Stock return: use pre_data and drop NaN
+        pre = pre_data[pre_data.index >= start]
+        pre_close = pre['close_price'].dropna()
+        if len(pre_close) < 2:
+            stock_ret = None
+        else:
+            stock_start = pre_close.iloc[0]
+            stock_end   = pre_close.iloc[-1]
+            stock_ret   = (stock_end / stock_start - 1) * 100
+
         return {
-                "stock_vs_spy_20d": round(float(stock_ret - spy_ret), 2) if spy_ret is not None else None,
-                "stock_vs_sector_20d": round(float(stock_ret - sector_ret), 2) if sector_ret is not None else None,
-                "sector_spy_return_ratio": round(sector_ret - spy_ret, 2)
-            }
+            "stock_vs_spy_20d": round(float(stock_ret - spy_ret), 2) if stock_ret is not None else None,
+            "stock_vs_sector_20d": round(float(stock_ret - sector_ret), 2) if stock_ret is not None else None,
+            "sector_spy_return_ratio": round(sector_ret - spy_ret, 2)
+        }
     except:
         return None
     

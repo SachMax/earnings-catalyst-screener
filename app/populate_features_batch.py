@@ -7,7 +7,7 @@ from features_library import *
 # ---------------------------------------------------------------------------
 # Config – adjust BATCH_SIZE to whatever your daily capacity allows
 # ---------------------------------------------------------------------------
-BATCH_SIZE = 1000   # rows per run
+BATCH_SIZE = 1500   # rows per run
 DB_PATH = 'data/universe.db'
 
 conn = sqlite3.connect(DB_PATH)

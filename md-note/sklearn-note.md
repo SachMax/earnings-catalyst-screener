@@ -396,3 +396,17 @@ pipe.fit(X_train, y_train)
 pipe.score(X_test, y_test)
 # output = 0.9298245614035088
 ```
+
+## Dealing with NaN Values (`sklearn.impute`)
+### `.SimpleImputer`
+Replace missing values using a descriptive statistic (e.g. mean, median, or most frequent) along each column, or using a constant value.
+Parameters=
+1. missing_values= int, float, str, np.nan, None or pandas.NA, default=np.nan
+2. strategy= str or Callable, default=’mean’
+3. fill_value= str or numerical value, default=None
+4. copy= bool, default=True
+5. add_indicator= bool, default=False
+6. keep_empty_features= bool, default=False
+
+## Sklearn.feature_selection
+Check official documentation

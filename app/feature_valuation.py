@@ -44,6 +44,3 @@ for index,row in df_ed.iterrows():
           (float(val), ticker, ed_clean.strftime("%Y-%m-%d")))
     conn.commit()
 conn.close()
-    
-
-

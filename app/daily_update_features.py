@@ -112,8 +112,7 @@ conn.commit()
 df = pd.read_sql("""
     SELECT ticker, earnings_date
     FROM ml_dataset
-    WHERE quality_curr IS NULL
-      AND earnings_date BETWEEN date('now') AND ?
+    AND earnings_date BETWEEN date('now') AND ?
     ORDER BY earnings_date
 """, conn, params=(cutoff.strftime("%Y-%m-%d"),), parse_dates=['earnings_date'])
 

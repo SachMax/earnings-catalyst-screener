@@ -1756,3 +1756,5 @@ def compute_volatility_percentile(ticker, as_of_date, df_price, hist_years=2):
         'vol_percentile': round(percentile, 2),
         'high_vol_regime': high_vol_regime
     }
+
+print(analyst_revision("ORCL", "2010-12-16"))

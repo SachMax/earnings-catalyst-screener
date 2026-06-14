@@ -7,13 +7,22 @@ project_root = os.path.dirname(app_dir)
 os.chdir(project_root)
 
 skip_files = {
+    "build_targets.py",
     "config.py",
+    'daily_update_features.py',
+    'evaluation_features.py',
+    'features_library.py',
     "init_features_table.py",   # run once manually
     "fetch_multiple_stocks.py", # run separately
     "fetch_price_history.py",   # run separately
     "fetch_data_intro.py",      # run separately
     "run_all_features.py",      # don't run itself
     "__init__.py",              # if any
+    'historical_earnings_date.py', 
+    'historical_feature.py',
+    'reset_ml_dataset.py', 
+    'testing.py', 
+    'train_model.py'
 }
 
 all_files = [f for f in os.listdir(app_dir) if f.endswith('.py')]

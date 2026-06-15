@@ -1757,4 +1757,85 @@ def compute_volatility_percentile(ticker, as_of_date, df_price, hist_years=2):
         'high_vol_regime': high_vol_regime
     }
 
-print(analyst_revision("ORCL", "2010-12-16"))
+def compute_guidance_bert (ticker, as_of_date):
+    
+    # 1. Find the most recent earnings date before as_of_date
+    ed_series = load_earnings_dates(ticker)   # your existing function
+    past_dates = ed_series[ed_series < pd.Timestamp(as_of_date)]
+    if past_dates.empty:
+        return None
+    prior_date = past_dates.sort_values(ascending=False).iloc[0].date()
+
+    # 2. Fetch the 8‑K from that prior date
+    try:
+        company = edgar.Company(ticker)
+        filings = company.get_filings(form="8-K",
+                                      filing_date=f"{prior_date}:{prior_date}")
+    except:
+        return None
+    # ---- helpers for keyword scan ----
+    def has_item(filing, item_code):
+        if filing.items is None:
+            return False
+        if isinstance(filing.items, str):
+            return item_code in filing.items
+        return any(item_code in str(it) for it in filing.items)
+
+    # Single‑word indicators
+    raise_words = [
+        'raise', 'raises', 'raised', 'raising',
+        'increase', 'increases', 'increased', 'increasing',
+        'boost', 'boosts', 'boosted', 'boosting',
+        'upgrade', 'upgrades', 'upgraded', 'upgrading'
+    ]
+    affirm_words = [
+        'affirm', 'affirms', 'affirmed', 'affirming',
+        'reaffirm', 'reaffirms', 'reaffirmed', 'reaffirming',
+        'reiterate', 'reiterates', 'reiterated', 'reiterating',
+        'maintain', 'maintains', 'maintained', 'maintaining',
+        'unchanged', 'no change'
+    ]
+
+    for f in filings:
+        # Only process 8‑Ks that contain Item 2.02
+        if not has_item(f, '2.02'):
+            continue
+        try:
+            text = f.obj().text()
+        except:
+            continue
+
+        lower_text = text.lower()
+        search_start = 0
+        while True:
+            idx = lower_text.find('guidance', search_start)
+            if idx == -1:
+                break
+            start_idx = max(0, idx - 200)
+            end_idx   = min(len(lower_text), idx + 500)
+            snippet = lower_text[start_idx:end_idx]
+
+            # Check for raise words with proximity & negation filter
+            for word in raise_words:
+                pos = snippet.find(word)
+                if pos == -1:
+                    continue
+                snippet_guidance_pos = snippet.find('guidance')
+                if abs(pos - snippet_guidance_pos) <= 100:
+                    before_word = snippet[max(0, pos-20):pos]
+                    if not any(neg in before_word for neg in ['not ', 'no ', 'may not ', 'without ']):
+                        return 1   # raise detected
+
+            for word in affirm_words:
+                pos = snippet.find(word)
+                if pos == -1:
+                    continue
+                snippet_guidance_pos = snippet.find('guidance')
+                if abs(pos - snippet_guidance_pos) <= 100:
+                    before_word = snippet[max(0, pos-20):pos]
+                    if not any(neg in before_word for neg in ['not ', 'no ', 'may not ']):
+                        return 0   # affirm detected
+
+            search_start = idx + 1
+
+    return None

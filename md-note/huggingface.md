@@ -345,3 +345,150 @@ Output:
 | 3     | No log        | 0.523402        | 0.458734             |
 | 4     | 1.784129      | 0.551524        | 0.469735             |
 | 5     | 1.784129      | 0.549046        | 0.468431             |
+### Training Hyperparameters
+
+`training_args = TrainingArguments(...)`: Initializes a configuration object containing instructions for the training loop.
+
+* **`"test-trainer"`**: Name of the directory where checkpoints are saved.
+* **`num_train_epochs=5`**: Total number of full training passes through data.
+* **`learning_rate=2e-5`**: Maximum step size used during weight updates.
+* **`weight_decay=0.01`**: Regularization penalty to prevent model overfitting.
+* **`per_device_train_batch_size=16`**: Samples processed per GPU during training.
+* **`per_device_eval_batch_size=16`**: Samples processed per GPU during evaluation.
+* **`eval_strategy="epoch"`**: Cadence control for triggering validation cycles.
+* **`gradient_accumulation_steps=4`**: Number of steps before updating weights.
+* **`lr_scheduler_type="cosine"`**: Pattern used to decrease the learning rate.
+* **`fp16=True`**: Activates semi-precision floats to reduce memory.
+
+### Full Training Set
+```python
+import torch
+from datasets import load_dataset
+from transformers import (
+    AutoTokenizer,
+    AutoModelForSequenceClassification,
+    DataCollatorWithPadding,
+    get_scheduler
+)
+from torch.utils.data import DataLoader
+from torch.optim import AdamW
+from tqdm.auto import tqdm
+import evaluate
+import sys # since i use google colab, the python --version seems not updated -> cant import torchvision.io.VideoReader
+sys.modules.pop("torchvision", None)
+# -----------------------
+# Dataset
+# -----------------------
+
+# loads the data set 
+raw_datasets = load_dataset("nyu-mll/glue", "cola")
+checkpoint = "distilbert-base-uncased-finetuned-sst-2-english"
+tokenizer3 = AutoTokenizer.from_pretrained(checkpoint)
+
+def tokenize_fn (phrases):
+    return tokenizer3(phrases['sentence'], truncation=True)
+
+tokenized_data = raw_datasets.map(tokenize_fn, batched=True)
+tokenized_data = tokenized_data.remove_columns(['sentence', 'idx'])
+tokenized_data = tokenized_data.rename_column('label', 'labels')
+tokenized_data.set_format("torch")
+Data_Collator = DataCollatorWithPadding(tokenizer=tokenizer3)
+
+DataTrainLoader = DataLoader(tokenized_data['train'], shuffle=True, batch_size=8, collate_fn=Data_Collator)
+DataEvalLoader = DataLoader(tokenized_data['validation'], batch_size=8, collate_fn=Data_Collator)
+
+model = AutoModelForSequenceClassification.from_pretrained(checkpoint)
+
+device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+model.to(device)
+
+Optimizer = AdamW(model.parameters(), lr=2e-5)
+
+epochs = 3
+
+num_training_steps = epochs * len(DataTrainLoader)
+
+lr_optimizer = get_scheduler(
+    name="linear",
+    optimizer=Optimizer,
+    num_warmup_steps=0,
+    num_training_steps=num_training_steps
+)
+
+progress_bar = tqdm(range(num_training_steps))
+
+for epoch in range(epochs):
+
+    model.train()
+
+    metric_train = evaluate.load("glue", "cola")
+
+    running_loss = 0
+
+    for batch in DataTrainLoader:
+
+        batch = {
+            k: v.to(device)
+            for k, v in batch.items()
+        }
+
+        Optimizer.zero_grad()
+
+        outputs = model(**batch)
+
+        loss = outputs.loss
+
+        loss.backward()
+
+        Optimizer.step()
+
+        lr_optimizer.step()
+
+        running_loss += loss.item()
+
+        preds = torch.argmax(
+            outputs.logits,
+            dim=-1
+        )
+
+        metric_train.add_batch(
+            predictions=preds,
+            references=batch["labels"]
+        )
+
+    train_metrics = metric_train.compute()
+
+    print(
+        f"Epoch {epoch+1} | "
+        f"Loss: {running_loss/len(DataTrainLoader):.4f} | "
+        f"Metrics: {train_metrics}"
+    )
+
+# output:
+# Epoch 1 | Loss: 0.5687 | Metrics: {'matthews_correlation': np.float64(0.23536268713446049)}
+# Epoch 2 | Loss: 0.3540 | Metrics: {'matthews_correlation': np.float64(0.621151182595149)}
+# Epoch 3 | Loss: 0.1879 | Metrics: {'matthews_correlation': np.float64(0.829995698058496)}
+
+model.save_pretrained("./my_bert_model")
+
+tokenizer3.save_pretrained("./my_bert_tokenizer")
+
+
+# ------------------
+# Evaluation
+# ------------------
+metric = evaluate.load("glue", "cola")
+model.eval()
+for batches in DataEvalLoader:
+    batches = {k: v.to(device) for k, v in batches.items()}
+
+    with torch.no_grad():
+        eval_output = model(**batches)
+
+    logits = eval_output.logits
+    preds = torch.argmax(logits, dim=-1)
+    metric.add_batch(predictions=preds, references=batches["labels"])
+results = metric.compute()
+print(results)
+# output: {'matthews_correlation': np.float64(0.5069898363255262)}
+```

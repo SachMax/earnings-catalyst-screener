@@ -1,7 +1,8 @@
 @echo off
 cd C:\Users\Sachio\OneDrive\Desktop\earnings-catalyst-screener
 
-for /f "tokens=2-4 delims=/ " %%a in ('date /t') do set TODAY_FILE=last_sunday_%%c-%%a-%%b.txt
+:: Simple daily marker
+set TODAY_FILE=last_sunday_%date:/=_%.txt
 
 if exist "%TODAY_FILE%" exit /b
 

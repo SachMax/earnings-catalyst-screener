@@ -1,10 +1,9 @@
 @echo off
 cd C:\Users\Sachio\OneDrive\Desktop\earnings-catalyst-screener
 
-:: Region-proof date string for today (YYYY-MM-DD)
-for /f "tokens=2-4 delims=/ " %%a in ('date /t') do set TODAY_FILE=last_quarterly_%%c-%%a-%%b.txt
+:: Simple daily marker (runs only once on the quarterly trigger day)
+set TODAY_FILE=last_quarterly_%date:/=_%.txt
 
-:: Since quarterly runs only 4 times a year, a daily marker is fine.
 if exist "%TODAY_FILE%" exit /b
 
 ping -n 1 8.8.8.8 >nul

@@ -1,10 +1,10 @@
 @echo off
 cd C:\Users\Sachio\OneDrive\Desktop\earnings-catalyst-screener
 
-:: Region-proof date string for today (YYYY-MM-DD)
-for /f "tokens=2-4 delims=/ " %%a in ('date /t') do set TODAY_FILE=last_saturday_%%c-%%a-%%b.txt
+:: Simple daily marker (prevents running twice on Saturday)
+set TODAY_FILE=last_saturday_%date:/=_%.txt
 
-:: Skip if already ran today (prevents running twice on Saturday)
+:: Skip if already ran today
 if exist "%TODAY_FILE%" exit /b
 
 ping -n 1 8.8.8.8 >nul

@@ -492,3 +492,85 @@ results = metric.compute()
 print(results)
 # output: {'matthews_correlation': np.float64(0.5069898363255262)}
 ```
+
+#### Accelerator
+```python
+from accelerate import Accelerator
+
+# added
+accelerator = Accelerator()
+model, Optimizer, DataTrainLoader, DataEvalLoader = accelerator.prepare(model, Optimizer, DataTrainLoader, DataEvalLoader)
+
+# ... epoch loop
+    for batch in DataTrainLoader:
+
+        Optimizer.zero_grad()
+
+        outputs = model(**batch)
+
+        loss = outputs.loss
+
+        accelerator.backward(loss) # changed
+
+        Optimizer.step()
+
+        lr_optimizer.step()
+
+        running_loss += loss.item()
+
+        preds = torch.argmax(
+            outputs.logits,
+            dim=-1
+        )
+        
+        # changed
+        metric_train.add_batch(
+            predictions=accelerator.gather(preds),
+            references=accelerator.gather(batch["labels"])
+        )
+
+    train_metrics = metric_train.compute()
+
+    print(
+        f"Epoch {epoch+1} | "
+        f"Loss: {running_loss/len(DataTrainLoader):.4f} | "
+        f"Metrics: {train_metrics}"
+    )
+
+
+unwrapped_model = accelerator.unwrap_model(model) # changed
+
+unwrapped_model.save_pretrained(
+    "./my_bert_model"
+)
+
+tokenizer3.save_pretrained("./my_bert_tokenizer")
+
+# ----------------
+# Eval Accelerated
+# ----------------
+metric = evaluate.load("glue", "cola")
+model.eval()
+for batches in DataEvalLoader:
+
+    with torch.no_grad():
+        eval_output = model(**batches)
+
+    logits = eval_output.logits
+    pred = torch.argmax(logits, dim=-1)
+    metric.add_batch(predictions=accelerator.gather(pred), references=accelerator.gather(batches["labels"]))
+results = metric.compute()
+print(results)
+```
+
+launching a training_file with accelarator:
+- using the terminal: 
+```bash
+accelerate config
+accelerate launch training.py
+```
+- using the notebook:
+```python
+from accelerate import notebook_launcher
+notebook_launcher(my_training_fn)
+```

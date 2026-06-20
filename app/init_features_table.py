@@ -1,8 +1,14 @@
+# init_features_table.py
 import sqlite3
 
-conn = sqlite3.connect('data/universe.db')
+DB_PATH = 'data/universe.db'
+
+conn = sqlite3.connect(DB_PATH)
 c = conn.cursor()
 
+# ---------------------------------------------------------------------------
+# 1. Create the features table if it doesn't exist (with ALL columns)
+# ---------------------------------------------------------------------------
 c.execute("""
 CREATE TABLE IF NOT EXISTS features (
     ticker TEXT,
@@ -10,13 +16,13 @@ CREATE TABLE IF NOT EXISTS features (
 
     -- Trifecta Core (Filters 1 to 4)
     eps_beat INTEGER,
-    revenue_growth_YoY INTEGER, 
+    revenue_growth_YoY INTEGER,
     revenue_growth_streak INTEGER,
-    revenue_beat INTEGER,                      -- Filter 2 (to be added soon)
-    guidance_valid INTEGER,                     
+    revenue_beat INTEGER,
+    guidance_valid INTEGER,
     gaap_profit INTEGER,
     sbc_pct_revenue REAL,
-    gaap_clean INTEGER,                          -- derived: gaap_profit AND sbc<3%
+    gaap_clean INTEGER,
 
     -- Fundamental (Filters 5 to 11)
     recommendationKey TEXT,
@@ -25,7 +31,7 @@ CREATE TABLE IF NOT EXISTS features (
     analyst_downgrades INTEGER,
     net_analyst_momentum INTEGER,
     eps_streak INTEGER,
-    revenue_beat_streak INTEGER,                 -- Filter 8 (to be added soon)
+    revenue_beat_streak INTEGER,
     sector TEXT,
     sector_relative_strength REAL,
     valuation_pe REAL,
@@ -90,8 +96,60 @@ CREATE TABLE IF NOT EXISTS features (
     scs_conviction_penalty TEXT,
     scs_capex_trigger_active INTEGER,
 
+    -- Evaluation output (written by evaluation_features.py)
+    filters_passed REAL,
+    conviction TEXT,
+    position_size_pct REAL,
+    phase TEXT,
+
+    -- New columns (from ml_dataset / features_remaining_update)
+    market_cap_bucket TEXT,
+    log_market_cap REAL,
+    return_20d REAL,
+    return_60d REAL,
+    return_120d REAL,
+    volatility_20d REAL,
+    volatility_60d REAL,
+    stock_vs_spy_20d REAL,
+    stock_vs_sector_20d REAL,
+    hv20_current REAL,
+    vol_percentile REAL,
+    high_vol_regime INTEGER,
+    vix_level REAL,
+    oil_move_1d REAL,
+    volume_ratio REAL,
+
     PRIMARY KEY (ticker, earnings_date)
 )
 """)
+
+# ---------------------------------------------------------------------------
+# 2. Idempotent safety net – add any new columns if the table already existed
+# ---------------------------------------------------------------------------
+new_columns = [
+    ('market_cap_bucket', 'TEXT'),
+    ('log_market_cap', 'REAL'),
+    ('return_20d', 'REAL'),
+    ('return_60d', 'REAL'),
+    ('return_120d', 'REAL'),
+    ('volatility_20d', 'REAL'),
+    ('volatility_60d', 'REAL'),
+    ('stock_vs_spy_20d', 'REAL'),
+    ('stock_vs_sector_20d', 'REAL'),
+    ('hv20_current', 'REAL'),
+    ('vol_percentile', 'REAL'),
+    ('high_vol_regime', 'INTEGER'),
+    ('vix_level', 'REAL'),
+    ('oil_move_1d', 'REAL'),
+    ('volume_ratio', 'REAL'),
+]
+
+for col_name, col_type in new_columns:
+    try:
+        c.execute(f"ALTER TABLE features ADD COLUMN {col_name} {col_type}")
+    except sqlite3.OperationalError:
+        pass   # column already exists
+
 conn.commit()
 conn.close()
+print("features table initialised with all columns.")

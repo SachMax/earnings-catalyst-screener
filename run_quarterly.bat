@@ -1,5 +1,5 @@
 @echo off
-cd C:\Users\Sachio\OneDrive\Desktop\earnings-catalyst-screener
+cd C:\Users\Sachio\Desktop\earnings-catalyst-screener
 
 :: Simple daily marker (runs only once on the quarterly trigger day)
 set TODAY_FILE=last_quarterly_%date:/=_%.txt

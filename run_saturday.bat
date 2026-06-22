@@ -1,5 +1,5 @@
 @echo off
-cd C:\Users\Sachio\OneDrive\Desktop\earnings-catalyst-screener
+cd C:\Users\Sachio\Desktop\earnings-catalyst-screener
 
 :: Simple daily marker (prevents running twice on Saturday)
 set TODAY_FILE=last_saturday_%date:/=_%.txt

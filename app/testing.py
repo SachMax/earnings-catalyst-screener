@@ -1,26 +1,7 @@
-# fix_sector_relative_strength.py
-import sqlite3
-import pandas as pd
-from datetime import date, timedelta
-from features_library import *
+import torch
 
-conn = sqlite3.connect('data/universe.db')
-c = conn.cursor()
+print(torch.cuda.is_available())
+print(torch.cuda.device_count())
 
-# Select all rows that already have features but might have NULL or stale sector relative strength
-ml_df = pd.read_sql("""
-    SELECT *
-    FROM ml_dataset
-    WHERE quality_curr IS NOT NULL 
-    ORDER BY earnings_date
-""", conn, parse_dates=['earnings_date'])
-
-feature_df = pd.read_sql("""
-    SELECT * from features order by earnings_date
-""", conn, parse_dates=['earnings_date'])
-
-ml_col = ml_df.columns.tolist()
-feature_col = feature_df.columns.to_list()
-
-mismatched = set(ml_df.columns) ^ set(feature_df.columns)
-print("Mismatched columns:", mismatched)
+if torch.cuda.is_available():
+    print(torch.cuda.get_device_name(0))

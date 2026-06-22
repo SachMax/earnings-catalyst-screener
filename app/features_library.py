@@ -77,10 +77,6 @@ import pandas as pd
 from datetime import date, timedelta
 import numpy as np
 import edgar
-import logging
-logging.getLogger("edgar").setLevel(logging.ERROR)
-
-edgar.set_identity("sachiomaximilliano166@gmail.com")
 
 def analyst_momentum(ticker, as_of_date):
     import yfinance as yf

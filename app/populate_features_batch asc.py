@@ -81,7 +81,7 @@ conn.commit()
 # ---------------------------------------------------------------------------
 df = pd.read_sql(f"""
     SELECT ticker, earnings_date FROM ml_dataset
-    WHERE quality_curr IS NULL
+    WHERE runup IS NULL
       AND target_5d_drift IS NOT NULL
     ORDER BY earnings_date ASC
     LIMIT {BATCH_SIZE}
@@ -153,6 +153,19 @@ for counter, (idx, row) in enumerate(df.iterrows(), 1):
     mom_feats  = compute_momentum_features(ed, df_price)
     vol_feats  = compute_volatility_features(ed, df_price)
     vol_pct    = compute_volatility_percentile(ticker, ed, df_price)
+    
+    # After computing sec_rel, force scalars
+    sec_rel_sector_spy = safe_get(sec_rel, 'sector_spy_return_ratio')
+    sec_rel_stock_spy  = safe_get(sec_rel, 'stock_vs_spy_20d')
+    sec_rel_stock_sector = safe_get(sec_rel, 'stock_vs_sector_20d')
+
+    # Convert possible Series to float (or None)
+    if isinstance(sec_rel_sector_spy, pd.Series):
+        sec_rel_sector_spy = sec_rel_sector_spy.iloc[0] if not sec_rel_sector_spy.empty else None
+    if isinstance(sec_rel_stock_spy, pd.Series):
+        sec_rel_stock_spy = sec_rel_stock_spy.iloc[0] if not sec_rel_stock_spy.empty else None
+    if isinstance(sec_rel_stock_sector, pd.Series):
+        sec_rel_stock_sector = sec_rel_stock_sector.iloc[0] if not sec_rel_stock_sector.empty else None
 
     c.execute("""
         UPDATE ml_dataset SET
@@ -230,8 +243,8 @@ for counter, (idx, row) in enumerate(df.iterrows(), 1):
         safe_get(sect_info, 'sector'), safe_get(sect_info, 'industry'),
         safe_get(mom_feats, 'return_20d'), safe_get(mom_feats, 'return_60d'), safe_get(mom_feats, 'return_120d'),
         safe_get(vol_feats, 'volatility_20d'), safe_get(vol_feats, 'volatility_60d'),
-        safe_get(sec_rel, 'sector_spy_return_ratio'),
-        safe_get(sec_rel, 'stock_vs_spy_20d'), safe_get(sec_rel, 'stock_vs_sector_20d'),
+        sec_rel_sector_spy,
+        sec_rel_stock_spy, sec_rel_stock_sector,
         safe_get(vol_pct, 'hv20_current'), safe_get(vol_pct, 'vol_percentile'), safe_get(vol_pct, 'high_vol_regime'),
         ticker, ed.strftime('%Y-%m-%d')
     ))

@@ -81,10 +81,6 @@ for _, row in df_upcoming.iterrows():
         'predicted_win_prob': win_prob,
         'predicted_drift': None,   # could add regressor later
         'guidance_bert_raise_prob': None,  # placeholder for FinBERT
-        'runup': X_row['runup'].iloc[0] if 'runup' in X_row.columns else None,
-        'rsi': X_row['rsi'].iloc[0] if 'rsi' in X_row.columns else None,
-        'sector_relative_strength': X_row['sector_relative_strength'].iloc[0] if 'sector_relative_strength' in X_row.columns else None,
-        'last_updated': pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')
     })
 
 # ---------------------------------------------------------------------------

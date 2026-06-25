@@ -47,8 +47,10 @@ dataset_dict = DatasetDict({"train": train_dataset, "test": test_dataset})
 # -------------------
 # Tokenization
 # -------------------
-checkpoint = "ProsusAI/finbert"
-tokenizer = AutoTokenizer.from_pretrained(checkpoint)
+model_checkpoint = "./my_guidance_model"            # use your saved model, not ProsusAI/finbert
+tokenizer_checkpoint = "./my_guidance_tokenizer"
+tokenizer = AutoTokenizer.from_pretrained(tokenizer_checkpoint)
+model = AutoModelForSequenceClassification.from_pretrained(model_checkpoint)
 
 def tokenize_func (sentences):
     return tokenizer(sentences["text"], truncation=True)
@@ -67,9 +69,7 @@ Data_Collator = DataCollatorWithPadding(tokenizer=tokenizer)
 DataTrainLoader = DataLoader(tokenized_data['train'], batch_size=8, shuffle=True, collate_fn=Data_Collator)
 DataTestLoader = DataLoader(tokenized_data['test'], batch_size=8, shuffle=True, collate_fn=Data_Collator)
 print("5. Created dataloader")
-# Model
-model = AutoModelForSequenceClassification.from_pretrained(checkpoint, num_labels=2, ignore_mismatched_sizes=True)
-print("6. Loaded model")
+
 Optimizer = AdamW(model.parameters(), lr=2e-5)
 
 # Accelerate
@@ -77,20 +77,20 @@ accelerator = Accelerator()
 print("7. Created accelerator")
 model, Optimizer, DataTrainLoader, DataTestLoader = accelerator.prepare(model, Optimizer, DataTrainLoader, DataTestLoader)
 print("8. Finished accelerator.prepare()")
-epochs = 5
+# epochs = 3
 
-num_training_steps = epochs * len(DataTrainLoader)
+# num_training_steps = epochs * len(DataTrainLoader)
 
-lr_optimizer = get_scheduler(
-    name="linear",
-    optimizer=Optimizer,
-    num_warmup_steps=0,
-    num_training_steps=num_training_steps
-)
-progress_bar = tqdm(range(num_training_steps))
-# -------------------
-# Model Training
-# -------------------
+# lr_optimizer = get_scheduler(
+#     name="linear",
+#     optimizer=Optimizer,
+#     num_warmup_steps=0,
+#     num_training_steps=num_training_steps
+# )
+# progress_bar = tqdm(range(num_training_steps))
+# # -------------------
+# # Model Training
+# # -------------------
 
 def model_evaluation (model, dataloader, accelerator):
 
@@ -126,50 +126,50 @@ def model_evaluation (model, dataloader, accelerator):
     }
 
 
-model.train()
+# model.train()
 
-best_f1 = 0.0
-best_model_state = None
+# best_f1 = 0.9139
+# best_model_state = None
 
-for epoch in range(epochs):
+# for epoch in range(epochs):
 
-    running_loss = 0
+#     running_loss = 0
 
-    for batch in DataTrainLoader:
+#     for batch in DataTrainLoader:
 
-        Optimizer.zero_grad()
-        outputs = model(**batch)
-        loss = outputs.loss
-        accelerator.backward(loss)
-        Optimizer.step()
+#         Optimizer.zero_grad()
+#         outputs = model(**batch)
+#         loss = outputs.loss
+#         accelerator.backward(loss)
+#         Optimizer.step()
 
-        lr_optimizer.step()
-        progress_bar.update(1)
-        running_loss += loss.item()
+#         lr_optimizer.step()
+#         progress_bar.update(1)
+#         running_loss += loss.item()
 
-    train_dict = model_evaluation(model, DataTrainLoader, accelerator)
+#     train_dict = model_evaluation(model, DataTrainLoader, accelerator)
 
-    print(
-        f"Epoch {epoch + 1} | "
-        f"Loss: {running_loss/len(DataTrainLoader):.4f} | "
-    )
-    print(f"Train Set {epoch + 1} Metrics:")
-    print(f"  Accuracy:  {train_dict['accuracy']:.4f}")
-    print(f"  F1 Score:  {train_dict['f1']:.4f}")
-    print(f"  Precision: {train_dict['precision']:.4f}")
-    print(f"  Recall:    {train_dict['recall']:.4f}")
-    print(f"  ROC AUC:   {train_dict['roc_auc']:.4f}")
-    print(f"  MCC:       {train_dict['mcc']:.4f}")
-    print(f"  log_loss:  {train_dict['log_loss']:.4f}")
-    print(f"  PR AUC:    {train_dict['pr_auc']:.4f}")
+#     print(
+#         f"Epoch {epoch + 1} | "
+#         f"Loss: {running_loss/len(DataTrainLoader):.4f} | "
+#     )
+#     print(f"Train Set {epoch + 1} Metrics:")
+#     print(f"  Accuracy:  {train_dict['accuracy']:.4f}")
+#     print(f"  F1 Score:  {train_dict['f1']:.4f}")
+#     print(f"  Precision: {train_dict['precision']:.4f}")
+#     print(f"  Recall:    {train_dict['recall']:.4f}")
+#     print(f"  ROC AUC:   {train_dict['roc_auc']:.4f}")
+#     print(f"  MCC:       {train_dict['mcc']:.4f}")
+#     print(f"  log_loss:  {train_dict['log_loss']:.4f}")
+#     print(f"  PR AUC:    {train_dict['pr_auc']:.4f}")
 
-    if train_dict['f1'] > best_f1:
-        best_f1 = train_dict['f1']
-        best_model_state = accelerator.unwrap_model(model).state_dict()
-        # Save immediately
-        accelerator.unwrap_model(model).save_pretrained("./my_guidance_model")
-        tokenizer.save_pretrained("./my_guidance_tokenizer")
-        print(f"  → New best F1: {best_f1:.4f}, model saved.")
+#     if train_dict['f1'] > best_f1:
+#         best_f1 = train_dict['f1']
+#         best_model_state = accelerator.unwrap_model(model).state_dict()
+#         # Save immediately
+#         accelerator.unwrap_model(model).save_pretrained("./my_guidance_model")
+#         tokenizer.save_pretrained("./my_guidance_tokenizer")
+#         print(f"  → New best F1: {best_f1:.4f}, model saved.")
 
 model.eval()
 eval_dict = model_evaluation(model, DataTestLoader, accelerator)

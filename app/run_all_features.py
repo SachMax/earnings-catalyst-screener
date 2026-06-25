@@ -11,7 +11,9 @@ skip_files = {
     "config.py",
     'daily_update_features.py',
     'evaluation_features.py',
+    'explore_earnings.py',
     'features_library.py',
+    'feature_guidance.py',
     "init_features_table.py",   # run once manually
     "fetch_multiple_stocks.py", # run separately
     "fetch_price_history.py",   # run separately
@@ -20,9 +22,15 @@ skip_files = {
     "__init__.py",              # if any
     'historical_earnings_date.py', 
     'historical_feature.py',
-    'reset_ml_dataset.py', 
     'testing.py', 
-    'train_model.py'
+    'train_model.py',
+    'generate_output_dataset.py',
+    'guidance_data_asc.py', 
+    'guidance_data_desc.py', 
+    'guidance_model.py', 
+    'guidance_model_ml_dataset.py', 
+    'populate_features_batch asc.py', 
+    'populate_features_batch_desc.py'
 }
 
 all_files = [f for f in os.listdir(app_dir) if f.endswith('.py')]

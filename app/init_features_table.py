@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS features (
     revenue_growth_streak INTEGER,
     revenue_beat INTEGER,
     guidance_valid INTEGER,
+    guidance_finbert_prob REAL,
     gaap_profit INTEGER,
     sbc_pct_revenue REAL,
     gaap_clean INTEGER,
@@ -142,6 +143,7 @@ new_columns = [
     ('vix_level', 'REAL'),
     ('oil_move_1d', 'REAL'),
     ('volume_ratio', 'REAL'),
+    ('guidance_finbert_prob', 'REAL')
 ]
 
 for col_name, col_type in new_columns:

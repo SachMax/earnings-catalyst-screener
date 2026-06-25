@@ -8,6 +8,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
 from xgboost import XGBClassifier
+import joblib
 from sklearn.metrics import roc_auc_score
 import warnings
 warnings.filterwarnings('ignore')
@@ -25,14 +26,15 @@ data = pd.read_sql(
 conn.close()
 
 data = data.dropna(subset=['target_5d_drift'])
-data = data.drop(columns=['ticker'], errors='ignore')
-
+data = data.drop(columns=['ticker', 'guidance_valid'], errors='ignore')
+data['guidance_bert_raise_prob'] = data['guidance_bert_raise_prob'].replace(-1.0, np.nan)
 # ---------------------------------------------------------------------------
 # 2. Create binary target (up/down)
 # ---------------------------------------------------------------------------
 target = 'target_5d_drift'
 y = (data[target] > 0).astype(int)          # 1 = up, 0 = down
 X = data.drop(columns=[target])
+X = X.replace([np.inf, -np.inf], np.nan)
 
 cat_cols = X.select_dtypes(include='object').columns.tolist()
 num_cols = X.select_dtypes(exclude='object').columns.tolist()
@@ -121,3 +123,8 @@ importances = pd.Series(rf_clf.feature_importances_, index=feature_names)
 top15 = importances.nlargest(15)
 for feat, imp in top15.items():
     print(f"  {feat}: {imp:.4f}")
+
+
+joblib.dump(rf_clf, 'models/rf_classifier.pkl')
+joblib.dump(preprocessor, 'models/preprocessor.pkl')
+print("Model and preprocessor saved.")

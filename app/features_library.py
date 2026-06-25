@@ -77,6 +77,15 @@ import pandas as pd
 from datetime import date, timedelta
 import numpy as np
 import edgar
+import joblib 
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+import torch
+
+edgar.set_identity("sachiomaximilliano166@gmail.com")
+
+tokenizer = AutoTokenizer.from_pretrained("./my_guidance_tokenizer")
+model = AutoModelForSequenceClassification.from_pretrained("./my_guidance_model")
+model.eval()   # set to evaluation mode
 
 def analyst_momentum(ticker, as_of_date):
     import yfinance as yf
@@ -690,7 +699,9 @@ def current_earnings_quality(ticker, as_of_date):
         stock = yf.Ticker(ticker)
         ed = stock.earnings_dates
         if ed is not None and not ed.empty:
-            reported = ed[(ed['Reported EPS'].notna()) & (ed.index < pd.Timestamp(as_of_date))]
+            reported = ed[ed['Reported EPS'].notna()]
+            date_mask = reported.index.date < as_of_date
+            reported = reported[date_mask]
             if not reported.empty:
                 latest = reported.sort_index(ascending=False).iloc[0]
                 surprise = latest.get('Surprise(%)')
@@ -793,12 +804,12 @@ def current_earnings_quality(ticker, as_of_date):
                         ni = val
                         break
                 # EPS (for beat)
-                eps_latest = get_value(income_df, 'EarningsPerShareDiluted', chosen_income_col)
+                eps_latest = get_value(income_df, 'EarningsPerShare, Diluted', chosen_income_col)
                 if eps_latest is None or pd.isna(eps_latest):
-                    eps_latest = get_value(income_df, 'EarningsPerShareBasic', chosen_income_col)
-                eps_prev = get_value(income_df, 'EarningsPerShareDiluted', prev_year_col)
+                    eps_latest = get_value(income_df, 'EarningsPerShare, Basic', chosen_income_col)
+                eps_prev = get_value(income_df, 'EarningsPerShare, Diluted', prev_year_col)
                 if eps_prev is None or pd.isna(eps_prev):
-                    eps_prev = get_value(income_df, 'EarningsPerShareBasic', prev_year_col)
+                    eps_prev = get_value(income_df, 'EarningsPerShare, Basic', prev_year_col)
         except (IndexError, ValueError):
             pass
 
@@ -1286,7 +1297,6 @@ def compute_prior_guidance_raised(ticker, as_of_date):
     return None
 
 def compute_sector_relative_strength(ticker, as_of_date, df_price):
-    """Return sector‑relative strength (sector ETF - SPY return) over 20 trading days."""
     import yfinance as yf
     import pandas as pd
     import numpy as np
@@ -1305,56 +1315,57 @@ def compute_sector_relative_strength(ticker, as_of_date, df_price):
         "Communication Services": "XLC",
         "Consumer Staples": "XLP"
     }
-    stock = yf.Ticker(ticker)
+
     if df_price.empty:
         return None
-    pre_data = df_price.loc[:pd.Timestamp(as_of_date - timedelta(days=1))]
 
+    pre_data = df_price.loc[:pd.Timestamp(as_of_date - timedelta(days=1))]
+    stock = yf.Ticker(ticker)
     sector = stock.info.get('sector', None)
     etf = sector_to_etf.get(sector)
     if etf is None:
-        return None
+        return None                     # sector truly unknown – feature undefined
+
+    # Default neutral values if data fetch fails
+    sector_ret = 0.0
+    spy_ret    = 0.0
+    stock_ret  = 0.0
 
     try:
         start = as_of_date - pd.offsets.BDay(20)
         xlk = yf.download(etf, start=start, end=(as_of_date - timedelta(days=1)), progress=False)
         spy = yf.download('SPY', start=start, end=(as_of_date - timedelta(days=1)), progress=False)
 
-        if xlk.empty or spy.empty:
-            return None
-
-        # Use last valid close (drop NaN)
-        xlk_close = xlk['Close'].dropna()
-        spy_close = spy['Close'].dropna()
-        if len(xlk_close) < 2 or len(spy_close) < 2:
-            return None
-
-        # Get start and end prices (earliest and latest valid)
-        xlk_start = xlk_close.iloc[0]
-        xlk_end = xlk_close.iloc[-1]
-        spy_start = spy_close.iloc[0]
-        spy_end = spy_close.iloc[-1]
-
-        sector_ret = (xlk_end / xlk_start - 1) * 100
-        spy_ret   = (spy_end / spy_start - 1) * 100
-
-        # Stock return: use pre_data and drop NaN
-        pre = pre_data[pre_data.index >= start]
-        pre_close = pre['close_price'].dropna()
-        if len(pre_close) < 2:
-            stock_ret = None
-        else:
-            stock_start = pre_close.iloc[0]
-            stock_end   = pre_close.iloc[-1]
-            stock_ret   = (stock_end / stock_start - 1) * 100
-
-        return {
-            "stock_vs_spy_20d": round(float(stock_ret - spy_ret), 2) if stock_ret is not None else None,
-            "stock_vs_sector_20d": round(float(stock_ret - sector_ret), 2) if stock_ret is not None else None,
-            "sector_spy_return_ratio": round(sector_ret - spy_ret, 2)
-        }
+        if not xlk.empty and not spy.empty:
+            # Force to 1‑D Series (in case of MultiIndex columns)
+            xlk_close = xlk['Close'].squeeze().dropna()
+            spy_close = spy['Close'].squeeze().dropna()
+            if len(xlk_close) >= 2 and len(spy_close) >= 2:
+                xlk_start = float(xlk_close.iloc[0])
+                xlk_end   = float(xlk_close.iloc[-1])
+                spy_start = float(spy_close.iloc[0])
+                spy_end   = float(spy_close.iloc[-1])
+                sector_ret = (xlk_end / xlk_start - 1) * 100
+                spy_ret    = (spy_end / spy_start - 1) * 100
     except:
-        return None
+        pass   # keep defaults of 0.0
+
+    try:
+        pre = pre_data[pre_data.index >= start]
+        # Force to Series and drop NaN
+        pre_close = pre['close_price'].squeeze().dropna()
+        if len(pre_close) >= 2:
+            stock_start = float(pre_close.iloc[0])
+            stock_end   = float(pre_close.iloc[-1])
+            stock_ret   = (stock_end / stock_start - 1) * 100
+    except:
+        pass
+
+    return {
+        "stock_vs_spy_20d": round(float(stock_ret - spy_ret), 2),
+        "stock_vs_sector_20d": round(float(stock_ret - sector_ret), 2),
+        "sector_spy_return_ratio": round(sector_ret - spy_ret, 2)
+    }
     
 def compute_sue(ticker, as_of_date):
     """Return SUE (Standardized Unexpected Earnings) for the most recent quarter."""
@@ -1369,7 +1380,9 @@ def compute_sue(ticker, as_of_date):
             return None
 
         # Filter to quarters before as_of_date that have a reported EPS
-        reported = ed[(ed['Reported EPS'].notna()) & (ed.index < pd.Timestamp(as_of_date))]
+        reported = ed[ed['Reported EPS'].notna()]
+        date_mask = reported.index.date < as_of_date
+        reported = reported[date_mask]
         if reported.empty:
             return None
 
@@ -1752,3 +1765,58 @@ def compute_volatility_percentile(ticker, as_of_date, df_price, hist_years=2):
         'vol_percentile': round(percentile, 2),
         'high_vol_regime': high_vol_regime
     }
+
+def compute_guidance_bert(ticker, as_of_date):
+    # Load earnings dates and find the most recent one before as_of_date
+    ed_series = load_earnings_dates(ticker)
+    past_dates = ed_series[ed_series < pd.Timestamp(as_of_date)]
+    if past_dates.empty:
+        return -1
+    prior_date = past_dates.sort_values(ascending=False).iloc[0].date()
+
+    # Fetch 8‑K filings for that date
+    try:
+        company = edgar.Company(ticker)
+        filings = company.get_filings(form="8-K", filing_date=f"{prior_date}:{prior_date}")
+    except:
+        return -1
+
+    # Helper to check for Item 2.02
+    def has_item(filing, item_code):
+        if filing.items is None:
+            return False
+        if isinstance(filing.items, str):
+            return item_code in filing.items
+        return any(item_code in str(it) for it in filing.items)
+
+    # Look through filings for guidance text
+    for f in filings:
+        if not has_item(f, '2.02'):
+            continue
+        try:
+            text = f.obj().text()
+        except:
+            continue
+
+        lower_text = text.lower()
+        idx = lower_text.find('guidance')
+        if idx == -1:
+            continue
+
+        # Extract snippet around the first “guidance” mention
+        start = max(0, idx - 200)
+        end = min(len(lower_text), idx + 500)
+        snippet = lower_text[start:end]
+        # Tokenize and predict
+        inputs = tokenizer(snippet, truncation=True, return_tensors="pt")
+        with torch.no_grad():
+            outputs = model(**inputs)
+            probs = torch.softmax(outputs.logits, dim=-1)
+            raise_prob = probs[0, 1].item()
+        
+        return raise_prob
+
+    return -1
+
+print("sue: ")
+print(compute_sue('NVDA', date(2024, 2, 24)))

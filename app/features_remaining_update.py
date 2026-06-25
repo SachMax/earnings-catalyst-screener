@@ -33,6 +33,7 @@ new_columns = [
     ('volatility_60d', 'REAL'),
     ('stock_vs_spy_20d', 'REAL'),
     ('stock_vs_sector_20d', 'REAL'),
+    ('guidance_finbert_prob', 'REAL')
 ]
 
 for col_name, col_type in new_columns:
@@ -45,14 +46,12 @@ conn.commit()
 # ---------------------------------------------------------------------------
 # 3. Load upcoming ticker/date pairs from earnings_calendar (next 7 days)
 # ---------------------------------------------------------------------------
-today = date.today()
-cutoff = today + timedelta(days=7)
 
 df = pd.read_sql("""
     SELECT ticker, earnings_date
     FROM earnings_calendar
-    WHERE earnings_date BETWEEN date('now') AND ?
-""", conn, params=(cutoff.strftime("%Y-%m-%d"),), parse_dates=['earnings_date'])
+    WHERE earnings_date > date('now')
+""", conn, parse_dates=['earnings_date'])
 
 if df.empty:
     print("No upcoming events in earnings_calendar.")
@@ -69,8 +68,6 @@ ticker_cache = {}
 for idx, row in df.iterrows():
     ticker = row['ticker']
     ed = row['earnings_date'].date()
-    if ticker != "ORCL":
-        continue
     if ticker not in ticker_cache:
         try:
             df_price = load_price_history(ticker)
@@ -91,17 +88,18 @@ for idx, row in df.iterrows():
     mom_feats  = compute_momentum_features(ed, df_price)
     vol_feats  = compute_volatility_features(ed, df_price)
     rel_str    = compute_sector_relative_strength(ticker, ed, df_price)
+    guidance_prob = compute_guidance_bert(ticker, ed)
 
+    def safe_val(d, k):
+        if d is None:
+            return None
+        return d.get(k)
     print(vol_pct)
     print(mcap_feats)
     print(mom_feats)
     print(vol_feats)
     print(rel_str)
-    def safe_val(d, k):
-        if d is None:
-            return None
-        return d.get(k)
-
+    print(f"{ticker}: inserted\n")
     c.execute("""
         UPDATE features SET
             vol_percentile = ?,
@@ -114,7 +112,8 @@ for idx, row in df.iterrows():
             volatility_20d = ?,
             volatility_60d = ?,
             stock_vs_spy_20d = ?,
-            stock_vs_sector_20d = ?
+            stock_vs_sector_20d = ?,
+            guidance_finbert_prob = ?
         WHERE ticker = ? AND earnings_date = ?
     """, (
         safe_val(vol_pct, 'vol_percentile'),
@@ -128,6 +127,7 @@ for idx, row in df.iterrows():
         safe_val(vol_feats, 'volatility_60d'),
         safe_val(rel_str, 'stock_vs_spy_20d'),
         safe_val(rel_str, 'stock_vs_sector_20d'),
+        guidance_prob,
         ticker,
         ed.strftime('%Y-%m-%d')
     ))

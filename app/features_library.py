@@ -1766,22 +1766,35 @@ def compute_volatility_percentile(ticker, as_of_date, df_price, hist_years=2):
         'high_vol_regime': high_vol_regime
     }
 
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+import torch
+import pandas as pd
+
+# Load once at module level (these are already in your file)
+tokenizer = AutoTokenizer.from_pretrained("./my_guidance_tokenizer")
+model = AutoModelForSequenceClassification.from_pretrained("./my_guidance_model")
+model.eval()
+
 def compute_guidance_bert(ticker, as_of_date):
-    # Load earnings dates and find the most recent one before as_of_date
+    """
+    Find all guidance‑related snippets in the most recent 8‑K before as_of_date,
+    run FinBERT on each individually, and return the MAXIMUM raise probability.
+    """
+    # ----- 1. Find the most recent earnings date before as_of_date -----
     ed_series = load_earnings_dates(ticker)
     past_dates = ed_series[ed_series < pd.Timestamp(as_of_date)]
     if past_dates.empty:
         return -1
     prior_date = past_dates.sort_values(ascending=False).iloc[0].date()
 
-    # Fetch 8‑K filings for that date
+    # ----- 2. Fetch the 8‑K for that date -----
     try:
         company = edgar.Company(ticker)
         filings = company.get_filings(form="8-K", filing_date=f"{prior_date}:{prior_date}")
     except:
         return -1
 
-    # Helper to check for Item 2.02
+    # ----- 3. Helper: check for Item 2.02 -----
     def has_item(filing, item_code):
         if filing.items is None:
             return False
@@ -1789,34 +1802,47 @@ def compute_guidance_bert(ticker, as_of_date):
             return item_code in filing.items
         return any(item_code in str(it) for it in filing.items)
 
-    # Look through filings for guidance text
+    # ----- 4. Expanded keyword list -----
+    keywords = [
+        "guidance", "outlook", "forecast", "expects", "expect",
+        "projects", "projected", "raises", "raising", "reaffirms",
+        "affirms", "maintains", "updates", "financial outlook",
+        "sees", "anticipates"
+    ]
+
+    all_scores = []
+
     for f in filings:
         if not has_item(f, '2.02'):
             continue
         try:
-            text = f.obj().text()
+            text = f.obj().text().lower()
         except:
             continue
 
-        lower_text = text.lower()
-        idx = lower_text.find('guidance')
-        if idx == -1:
-            continue
+        # Scan for every occurrence of every keyword
+        for kw in keywords:
+            start = 0
+            while True:
+                idx = text.find(kw, start)
+                if idx == -1:
+                    break
+                # Extract the same window size used during training (300 before, 500 after)
+                snippet_start = max(0, idx - 300)
+                snippet_end = min(len(text), idx + 500)
+                snippet = text[snippet_start:snippet_end]
 
-        # Extract snippet around the first “guidance” mention
-        start = max(0, idx - 200)
-        end = min(len(lower_text), idx + 500)
-        snippet = lower_text[start:end]
-        # Tokenize and predict
-        inputs = tokenizer(snippet, truncation=True, return_tensors="pt")
-        with torch.no_grad():
-            outputs = model(**inputs)
-            probs = torch.softmax(outputs.logits, dim=-1)
-            raise_prob = probs[0, 1].item()
-        
-        return raise_prob
+                # ----- Tokenize and predict -----
+                inputs = tokenizer(snippet, truncation=True, return_tensors="pt")
+                with torch.no_grad():
+                    outputs = model(**inputs)
+                    probs = torch.softmax(outputs.logits, dim=-1)
+                    raise_prob = probs[0, 1].item()
+                all_scores.append(raise_prob)
 
-    return -1
+                start = idx + 1   # move past this occurrence
 
-print("sue: ")
-print(compute_sue('NVDA', date(2024, 2, 24)))
+    # ----- 5. Return max score, or -1 if no snippets were found -----
+    if not all_scores:
+        return -1
+    return max(all_scores)

@@ -1,7 +1,7 @@
 # evaluation_features.py
 import sqlite3
 import pandas as pd
-from datetime import date
+from datetime import date, timedelta
 
 conn = sqlite3.connect('data/universe.db')
 c = conn.cursor()
@@ -19,9 +19,13 @@ for col in ['filters_passed', 'conviction', 'position_size_pct', 'phase']:
 # ---------------------------------------------------------------------------
 # 1. Load upcoming events (next 7 days for live screening)
 # ---------------------------------------------------------------------------
-today = date.today().strftime('%Y-%m-%d')
-df = pd.read_sql(f"SELECT * FROM features WHERE earnings_date > date('now')",
-                 conn, parse_dates=['earnings_date'])
+today = date.today()
+cutoff = today + timedelta(days=7)
+df = pd.read_sql("""
+    SELECT * FROM features
+    WHERE earnings_date BETWEEN date('now') AND ?
+    ORDER BY earnings_date
+""", conn, params=(cutoff.strftime('%Y-%m-%d'),), parse_dates=['earnings_date'])
 
 if df.empty:
     print("No upcoming earnings found.")

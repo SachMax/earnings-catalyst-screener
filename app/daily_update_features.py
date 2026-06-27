@@ -4,18 +4,14 @@ import time
 from datetime import date, timedelta
 from features_library import *
 
-# ---------------------------------------------------------------------------
-# Connect
-# ---------------------------------------------------------------------------
 conn = sqlite3.connect('data/universe.db')
 conn.execute("PRAGMA busy_timeout = 5000")
 c = conn.cursor()
 
 # ---------------------------------------------------------------------------
-# 1. Ensure all feature columns exist (add any missing ones)
+# 1. Ensure all feature columns exist
 # ---------------------------------------------------------------------------
 columns = [
-    # current earnings quality
     ('quality_curr', 'INTEGER'), ('score_curr', 'INTEGER'),
     ('revenue_latest', 'REAL'), ('revenue_prev', 'REAL'),
     ('gm_change_bps', 'REAL'), ('sbc_pct_curr', 'REAL'),
@@ -23,54 +19,43 @@ columns = [
     ('revenue_beat', 'INTEGER'), ('eps_beat_curr', 'INTEGER'),
     ('gaap_profit', 'INTEGER'),
     ('eps_surprise_pct', 'REAL'), ('revenue_surprise_pct', 'REAL'),
-    # historical quality
     ('hist_quality', 'INTEGER'), ('avg_gm', 'REAL'),
     ('avg_sbc', 'REAL'), ('avg_ocf', 'REAL'),
     ('fcf_pos_count', 'INTEGER'), ('yoy_growth_streak', 'INTEGER'),
     ('scs_market_punishing', 'INTEGER'), ('scs_monetisation_evidence', 'INTEGER'),
     ('scs_conviction_penalty', 'TEXT'), ('scs_capex_trigger', 'INTEGER'),
-    # price technicals
     ('runup', 'REAL'), ('rsi', 'REAL'), ('volume_ratio', 'REAL'),
-    # past earnings action
     ('surge_hold_count', 'INTEGER'), ('fade_count', 'INTEGER'),
     ('drop_count', 'INTEGER'), ('past_earnings_action', 'TEXT'),
     ('pct_surge', 'REAL'), ('pullback_bounce_count', 'INTEGER'),
     ('avg_pullback_depth', 'REAL'), ('past_pullback_bounce', 'TEXT'),
     ('post_earnings_drift', 'REAL'),
-    # guidance / SUE / streaks / market
     ('guidance_valid', 'INTEGER'),
     ('sue', 'REAL'), ('hist_runup_avg', 'REAL'),
     ('seasonality_match', 'INTEGER'), ('pct_from_52w_low', 'REAL'),
     ('eps_streak', 'INTEGER'), ('revenue_streak', 'INTEGER'),
     ('vix_level', 'REAL'), ('oil_move_1d', 'REAL'),
-    # analyst momentum raw
     ('analyst_consensus', 'INTEGER'),
     ('recommendation_mean', 'REAL'),
     ('upgrade_count', 'INTEGER'),
     ('downgrade_count', 'INTEGER'),
     ('net_analyst_momentum', 'INTEGER'),
     ('has_analyst_coverage', 'INTEGER'),
-    # analyst revisions
     ('upward_revision_count60d', 'INTEGER'),
     ('downward_revision_count60d', 'INTEGER'),
     ('net_revision_count_60d', 'INTEGER'),
     ('revision_breadth_60d', 'REAL'),
     ('revision_trend_label', 'TEXT'),
     ('estimate_revision_pct', 'REAL'),
-    # insider
     ('insider_flag', 'INTEGER'), ('insider_net_value', 'REAL'),
     ('insider_buy_count', 'INTEGER'), ('insider_sell_count', 'INTEGER'),
-    # market cap & sector
     ('market_cap_bucket', 'TEXT'), ('log_market_cap', 'REAL'),
     ('sector', 'TEXT'), ('industry', 'TEXT'),
-    # momentum & volatility
     ('return_20d', 'REAL'), ('return_60d', 'REAL'), ('return_120d', 'REAL'),
     ('volatility_20d', 'REAL'), ('volatility_60d', 'REAL'),
-    # relative strength
     ('sector_relative_strength', 'REAL'),
     ('stock_vs_spy_20d', 'REAL'),
     ('stock_vs_sector_20d', 'REAL'),
-    # volatility percentile (Filter 24 proxy)
     ('hv20_current', 'REAL'),
     ('vol_percentile', 'REAL'),
     ('high_vol_regime', 'INTEGER'),
@@ -84,7 +69,7 @@ for col, col_type in columns:
 conn.commit()
 
 # ---------------------------------------------------------------------------
-# 2. Insert any new ticker/earnings_date pairs from the upcoming 7 days
+# 2. Insert new upcoming ticker/earnings_date pairs
 # ---------------------------------------------------------------------------
 today = date.today()
 cutoff = today + timedelta(days=7)
@@ -106,13 +91,13 @@ for _, cal_row in upcoming.iterrows():
 conn.commit()
 
 # ---------------------------------------------------------------------------
-# 3. Load rows that still need features (quality_curr IS NULL) 
-#    for tickers in the upcoming window
+# 3. Load rows that still need features (upcoming window)
 # ---------------------------------------------------------------------------
 df = pd.read_sql("""
     SELECT ticker, earnings_date
     FROM ml_dataset
-    AND earnings_date BETWEEN date('now') AND ?
+    WHERE quality_curr IS NULL
+      AND earnings_date BETWEEN date('now') AND ?
     ORDER BY earnings_date
 """, conn, params=(cutoff.strftime("%Y-%m-%d"),), parse_dates=['earnings_date'])
 
@@ -185,6 +170,7 @@ for counter, (idx, row) in enumerate(df.iterrows(), 1):
     mom_feats  = compute_momentum_features(ed, df_price)
     vol_feats  = compute_volatility_features(ed, df_price)
     vol_pct    = compute_volatility_percentile(ticker, ed, df_price)
+    guidance_prob = compute_guidance_bert(ticker, ed)
 
     c.execute("""
         UPDATE ml_dataset SET
@@ -219,7 +205,7 @@ for counter, (idx, row) in enumerate(df.iterrows(), 1):
             volatility_20d = ?, volatility_60d = ?,
             sector_relative_strength = ?,
             stock_vs_spy_20d = ?, stock_vs_sector_20d = ?,
-            hv20_current = ?, vol_percentile = ?, high_vol_regime = ?
+            hv20_current = ?, vol_percentile = ?, high_vol_regime = ?, guidance_bert_raise_prob = ?
         WHERE ticker = ? AND earnings_date = ?
     """, (
         safe_get(curr, 'quality'), safe_get(curr, 'score'),
@@ -265,9 +251,11 @@ for counter, (idx, row) in enumerate(df.iterrows(), 1):
         safe_get(sec_rel, 'sector_spy_return_ratio'),
         safe_get(sec_rel, 'stock_vs_spy_20d'), safe_get(sec_rel, 'stock_vs_sector_20d'),
         safe_get(vol_pct, 'hv20_current'), safe_get(vol_pct, 'vol_percentile'), safe_get(vol_pct, 'high_vol_regime'),
+        guidance_prob,
         ticker, ed.strftime('%Y-%m-%d')
     ))
     conn.commit()
+    print(f"{ticker} ({ed}): inserted")
     time.sleep(0.2)
 
 print("Daily feature update complete.")

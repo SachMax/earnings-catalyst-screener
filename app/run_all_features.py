@@ -30,7 +30,10 @@ skip_files = {
     'guidance_model.py', 
     'guidance_model_ml_dataset.py', 
     'populate_features_batch asc.py', 
-    'populate_features_batch_desc.py'
+    'populate_features_batch_desc.py',
+    'fix_eps.py',
+    'fix_sector_columns.py',
+    'fix_sue.py',
 }
 
 all_files = [f for f in os.listdir(app_dir) if f.endswith('.py')]

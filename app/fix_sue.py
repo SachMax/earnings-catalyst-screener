@@ -23,8 +23,7 @@ for i, (_, row) in enumerate(df.iterrows(), 1):
 
     sue = compute_sue(ticker, ed)
     if sue is None:
-        print(f"{ticker} ({ed}): no data")
-        continue
+        sue = -9999.0
     c.execute("""
         UPDATE ml_dataset SET
             sue = ?

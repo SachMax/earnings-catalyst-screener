@@ -40,4 +40,8 @@ if not df.empty:
     st.dataframe(styled_df)
 
 st.divider()
-st.markdown("Built by Sachio Maximilliano Johan · [GitHub](https://github.com/yourusername) · [arXiv](https://arxiv.org/abs/XXXX.XXXXX)")
+st.markdown(
+    "Built by Sachio Maximilliano Johan · "
+    "[GitHub](https://github.com/SachMax) · "
+    "[SSRN Preprint](https://papers.ssrn.com/abstract=7009759)"
+)

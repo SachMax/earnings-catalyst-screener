@@ -31,3 +31,10 @@ else:
     display_df = df.drop(columns=['earnings_date'])
     styled_df = display_df.style.map(color_prob, subset=['predicted_win_prob'])
     st.dataframe(styled_df)
+
+st.divider()
+st.markdown(
+    "Built by Sachio Maximilliano Johan · "
+    "[GitHub](https://github.com/SachMax) · "
+    "[SSRN Preprint](https://papers.ssrn.com/abstract=7009759)"
+)

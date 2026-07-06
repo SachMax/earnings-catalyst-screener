@@ -1,41 +1,138 @@
 @echo off
-cd C:\Users\Sachio\Desktop\earnings-catalyst-screener
+cd /d C:\Users\Sachio\Desktop\earnings-catalyst-screener
 
-:: Daily marker using today's date (slashes replaced with underscores)
+:: ------------------------------------------------------------------
+:: Configuration
+:: ------------------------------------------------------------------
+
+set PYTHON=C:\Users\Sachio\Desktop\earnings-catalyst-screener\.venv\Scripts\python.exe
+set LOG=run_log.txt
+
+:: Delete yesterday's log
+if exist "%LOG%" del /q "%LOG%"
+
+echo ===============================================================>>"%LOG%"
+echo [%date% %time%] Daily pipeline started>>"%LOG%"
+echo ===============================================================>>"%LOG%"
+
+:: Daily marker
 set TODAY_FILE=last_daily_%date:/=_%.txt
 
-:: Skip if already ran today
-if exist "%TODAY_FILE%" exit /b
+if exist "%TODAY_FILE%" (
+    echo [%date% %time%] Pipeline already ran today.>>"%LOG%"
+    exit /b
+)
 
 :: Internet check
 ping -n 1 8.8.8.8 >nul
-if errorlevel 1 exit /b
+if errorlevel 1 (
+    echo [%date% %time%] ERROR: No internet connection.>>"%LOG%"
+    exit /b
+)
 
-:: 1. Refresh the upcoming earnings calendar
-C:\Users\Sachio\AppData\Local\Programs\Python\Python311\python.exe app\explore_earnings.py
+:: ================================================================
+:: Stage 1
+:: ================================================================
+echo [%date% %time%] START  Stage 1 - explore_earnings.py>>"%LOG%"
+%PYTHON% app\explore_earnings.py >>"%LOG%" 2>&1
+if errorlevel 1 goto Stage1Error
+echo [%date% %time%] FINISH Stage 1>>"%LOG%"
 
-:: 2. Run full feature population (options, sector, etc.)
-C:\Users\Sachio\AppData\Local\Programs\Python\Python311\python.exe app\run_all_features.py
+:: ================================================================
+:: Stage 2
+:: ================================================================
+echo [%date% %time%] START  Stage 2 - run_all_features.py>>"%LOG%"
+%PYTHON% app\run_all_features.py >>"%LOG%" 2>&1
+if errorlevel 1 goto Stage2Error
+echo [%date% %time%] FINISH Stage 2>>"%LOG%"
 
-:: 3. Rule‑based screening (Phase/Conviction)
-C:\Users\Sachio\AppData\Local\Programs\Python\Python311\python.exe app\evaluation_features.py
+:: ================================================================
+:: Stage 3
+:: ================================================================
+echo [%date% %time%] START  Stage 3 - evaluation_features.py>>"%LOG%"
+%PYTHON% app\evaluation_features.py >>"%LOG%" 2>&1
+if errorlevel 1 goto Stage3Error
+echo [%date% %time%] FINISH Stage 3>>"%LOG%"
 
-:: 4. Refresh upcoming features in ml_dataset
-C:\Users\Sachio\AppData\Local\Programs\Python\Python311\python.exe app\daily_update_features.py
+:: ================================================================
+:: Stage 4
+:: ================================================================
+echo [%date% %time%] START  Stage 4 - daily_update_features.py>>"%LOG%"
+%PYTHON% app\daily_update_features.py >>"%LOG%" 2>&1
+if errorlevel 1 goto Stage4Error
+echo [%date% %time%] FINISH Stage 4>>"%LOG%"
 
-:: 5. Backfill guidance probabilities for upcoming events
-C:\Users\Sachio\AppData\Local\Programs\Python\Python311\python.exe app\guidance_bert_output_dataset.py
+:: ================================================================
+:: Stage 5
+:: ================================================================
+echo [%date% %time%] START  Stage 5 - guidance_bert_output_dataset.py>>"%LOG%"
+%PYTHON% app\guidance_bert_output_dataset.py >>"%LOG%" 2>&1
+if errorlevel 1 goto Stage5Error
+echo [%date% %time%] FINISH Stage 5>>"%LOG%"
 
-:: 6. Generate the dashboard table
-C:\Users\Sachio\AppData\Local\Programs\Python\Python311\python.exe app\generate_output_dataset.py
+:: ================================================================
+:: Stage 6
+:: ================================================================
+echo [%date% %time%] START  Stage 6 - generate_output_dataset.py>>"%LOG%"
+%PYTHON% app\generate_output_dataset.py >>"%LOG%" 2>&1
+if errorlevel 1 goto Stage6Error
+echo [%date% %time%] FINISH Stage 6>>"%LOG%"
 
-:: 7. Update local database to MOTHERDUCK Cloud Database
-C:\Users\Sachio\Desktop\earnings-catalyst-screener\app\to_duckdc_cloud.py
+:: ================================================================
+:: Stage 7
+:: ================================================================
+echo [%date% %time%] START  Stage 7 - to_duckdc_cloud.py>>"%LOG%"
+%PYTHON% app\to_duckdc_cloud.py >>"%LOG%" 2>&1
+if errorlevel 1 goto Stage7Error
+echo [%date% %time%] FINISH Stage 7>>"%LOG%"
 
-:: 8. Backfill historical ml_dataset rows (keeps training set growing)
-C:\Users\Sachio\AppData\Local\Programs\Python\Python311\python.exe app\populate_features_batch_desc.py
+:: ================================================================
+:: Stage 8
+:: ================================================================
+echo [%date% %time%] START  Stage 8 - populate_features_batch_desc.py>>"%LOG%"
+%PYTHON% app\populate_features_batch_desc.py >>"%LOG%" 2>&1
+if errorlevel 1 goto Stage8Error
+echo [%date% %time%] FINISH Stage 8>>"%LOG%"
 
-:: runs everyday at 8pm 
-:: Mark as completed for today (the scripts are still running in their own windows)
 echo done > "%TODAY_FILE%"
-echo %date% %time% Full daily pipeline completed >> run_log.txt
+
+echo [%date% %time%] SUCCESS - Full daily pipeline completed>>"%LOG%"
+echo ===============================================================>>"%LOG%"
+
+exit /b
+
+:: ================================================================
+:: Error handlers
+:: ================================================================
+
+:Stage1Error
+echo [%date% %time%] ERROR in Stage 1 (explore_earnings.py)>>"%LOG%"
+exit /b
+
+:Stage2Error
+echo [%date% %time%] ERROR in Stage 2 (run_all_features.py)>>"%LOG%"
+exit /b
+
+:Stage3Error
+echo [%date% %time%] ERROR in Stage 3 (evaluation_features.py)>>"%LOG%"
+exit /b
+
+:Stage4Error
+echo [%date% %time%] ERROR in Stage 4 (daily_update_features.py)>>"%LOG%"
+exit /b
+
+:Stage5Error
+echo [%date% %time%] ERROR in Stage 5 (guidance_bert_output_dataset.py)>>"%LOG%"
+exit /b
+
+:Stage6Error
+echo [%date% %time%] ERROR in Stage 6 (generate_output_dataset.py)>>"%LOG%"
+exit /b
+
+:Stage7Error
+echo [%date% %time%] ERROR in Stage 7 (to_duckdc_cloud.py)>>"%LOG%"
+exit /b
+
+:Stage8Error
+echo [%date% %time%] ERROR in Stage 8 (populate_features_batch_desc.py)>>"%LOG%"
+exit /b

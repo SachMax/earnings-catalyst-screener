@@ -1,9 +1,8 @@
-from app.features_library import *
-import pandas as pd
-from datetime import date, timedelta
+import re
 
-ticker = "ORCL"
-ed = date.today()  # or use a specific upcoming date
-df_price = load_price_history(ticker)
-rel = compute_sector_relative_strength(ticker, ed, df_price)
-print(rel)
+# split, sub
+
+test_string = 'hello world, you are the best world'
+pattern = re.compile(r"world")
+subbed_string = pattern.sub("planet", test_string)
+print(subbed_string)

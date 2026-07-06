@@ -22,14 +22,14 @@ The Earnings Catalyst Screener is a fully automated, production‑grade system t
 
 ---
 
-## 🚀 Key Features
+## Key Features
 
-- ✅ **Leak‑free feature engineering** — every feature is point‑in‑time safe, verified by a manual audit
-- ✅ **Phase‑aware screening** — framework distinguishes between pre‑earnings (Phase 2) and post‑earnings (Phase 4) opportunities
-- ✅ **NLP‑powered guidance detection** — FinBERT replaces a rule‑based keyword scanner
-- ✅ **Fully automated pipeline** — Windows Task Scheduler runs the entire pipeline every morning without manual intervention
-- ✅ **Cloud‑connected dashboard** — live Streamlit dashboard backed by a MotherDuck cloud database, refreshed daily
-- ✅ **Research‑backed** — documented in a preprint on SSRN with detailed methodology and empirical results
+- **Leak‑free feature engineering** — every feature is point‑in‑time safe, verified by a manual audit
+- **Phase‑aware screening** — framework distinguishes between pre‑earnings (Phase 2) and post‑earnings (Phase 4) opportunities
+- **NLP‑powered guidance detection** — FinBERT replaces a rule‑based keyword scanner
+- **Fully automated pipeline** — Windows Task Scheduler runs the entire pipeline every morning without manual intervention
+- **Cloud‑connected dashboard** — live Streamlit dashboard backed by a MotherDuck cloud database, refreshed daily
+- **Research‑backed** — documented in a preprint on SSRN with detailed methodology and empirical results
 
 ---
 

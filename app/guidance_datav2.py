@@ -3,12 +3,13 @@ import re
 from datetime import timedelta
 import pandas as pd
 import edgar
-from features_library import load_earnings_dates
 import sqlite3
 import json
 import time
 
-def extract_guidance_rich(ticker, as_of_date):
+edgar.set_identity("sachiomaximilliano166@gmail.com")
+
+def extract_guidance_rich(ticker, as_of_date, earnings_lookup):
     """
     Returns dict:
         label, confidence_score, confidence_level, classification_reason,
@@ -18,7 +19,7 @@ def extract_guidance_rich(ticker, as_of_date):
     """
     # ---------- constants ----------
     safe_stems = ['guidance', 'outlook', 'forecast']
-    generic_stems = ['expect', 'anticipat', 'project']
+    generic_stems = ['expect', 'anticipate', 'project']
     raise_words = ['raise','raises','raised','raising','increase','increases','increased','increasing',
                    'boost','boosts','boosted','boosting','upgrade','upgrades','upgraded','upgrading',
                    'upward','higher','stronger','improve','narrow']
@@ -64,15 +65,11 @@ def extract_guidance_rich(ticker, as_of_date):
         }
 
     def sentence_split(text):
-        # Split on blank lines to preserve paragraphs
         paragraphs = [p.strip() for p in text.split('\n\n') if p.strip()]
         sentences = []
         for para in paragraphs:
-            # First, split on semicolons when they act as clause separators
-            # (avoid splitting numbers like "1.5;2.0")
             parts = re.split(r'(?<!\d);(?!\d)', para)
             for part in parts:
-                # Then split on sentence-ending punctuation
                 sents = re.split(r'(?<!\d)(?<!\b[A-Z])(?<!\b[A-Z][a-z])\.(?=\s+|\s*$)', part)
                 final = []
                 for s in sents:
@@ -93,10 +90,6 @@ def extract_guidance_rich(ticker, as_of_date):
 
     # ---- numerical parsing with units ----
     def normalize_number(tok, is_percent=False):
-        """
-        Convert a token like '$4.5B', '500M', '3.5 million', '12K', '18%' into a float.
-        Returns (value, unit_type) where unit_type is 'dollar' or 'percent'.
-        """
         if is_percent:
             clean = tok.replace('%', '').strip()
             try:
@@ -105,15 +98,12 @@ def extract_guidance_rich(ticker, as_of_date):
                 return None, None
 
         orig = tok.replace('$', '').strip()
-        # Remove commas
         orig = orig.replace(',', '')
-        # Define multipliers
         multipliers = {
             'billion': 1e9, 'billions': 1e9, 'b': 1e9,
             'million': 1e6, 'millions': 1e6, 'm': 1e6,
             'thousand': 1e3, 'k': 1e3,
         }
-        # Try to extract suffix
         num_part = ''
         suffix = ''
         for i, ch in enumerate(orig):
@@ -131,14 +121,10 @@ def extract_guidance_rich(ticker, as_of_date):
         if suffix in multipliers:
             val *= multipliers[suffix]
             return val, 'dollar'
-        # If no suffix, assume the value is already in the standard unit (probably millions)
         return val, 'dollar'
 
     def parse_range(tok, is_percent=False):
-        """Parse a range string like '4.2–4.4' or '$4.2B–$4.4B' into (low, high, unit)."""
-        # Remove leading/trailing whitespace and possible leading '$'
         tok = tok.strip()
-        # Split on dash variants
         parts = re.split(r'\s*[-–]\s*', tok)
         if len(parts) != 2:
             return None, None, None
@@ -146,7 +132,6 @@ def extract_guidance_rich(ticker, as_of_date):
         high_val, high_unit = normalize_number(parts[1], is_percent)
         if low_val is None or high_val is None:
             return None, None, None
-        # Ensure consistent unit
         if low_unit != high_unit:
             return None, None, None
         return low_val, high_val, low_unit
@@ -156,48 +141,76 @@ def extract_guidance_rich(ticker, as_of_date):
         Look for pairs of numbers (ranges or singles) that represent old vs new guidance.
         Returns (label, evidence) or (None, None).
         """
-        # Patterns for ranges and singles
+        # Patterns for ranges and singles (unchanged)
         range_pat = r'(\$?\d+\.?\d*\s*[BMKbmk]?\s*[-–]\s*\$?\d+\.?\d*\s*[BMKbmk]?)'
-        single_pat = r'(\$?\d+\.?\d*\s*[BMKbmk]?(?:\s*(?:billion|million|thousand))?)'
+        single_pat = r'(\$?\d+\.?\d*\s*[BMKbmk]?(?:\s*(?i:billion|million|thousand))?)'
         percent_single_pat = r'(\d+\.?\d*\s*%)'
 
-        # Try to split text into prior and current parts around revision words
-        parts = re.split(r'\b(?:previously|prior|old|now|updated|new|current|revised)\b', text, flags=re.IGNORECASE)
-        if len(parts) >= 2:
-            prior_part = parts[-2]
-            current_part = parts[-1]
+        # Define which signals indicate old / new guidance
+        OLD_SIGNALS = {'previously', 'prior', 'old', 'before', 'last'}
+        NEW_SIGNALS = {'now', 'updated', 'new', 'current', 'revised', 'after'}
 
-            # Determine if we're dealing with percentages by searching for '%'
-            is_percent = '%' in prior_part or '%' in current_part
+        # Split on all revision words
+        parts = re.split(
+            r'\b(?:previously|prior|old|before|last|now|updated|new|current|revised|after)\b',
+            text, flags=re.IGNORECASE
+        )
 
-            # Try ranges first
-            prior_range = re.search(range_pat, prior_part)
-            current_range = re.search(range_pat, current_part)
-            if prior_range and current_range:
-                pl, ph, pu = parse_range(prior_range.group(1), is_percent)
-                cl, ch, cu = parse_range(current_range.group(1), is_percent)
-                if None not in (pl, ph, cl, ch) and pu == cu:
-                    return compare_ranges(pl, ph, cl, ch, pu)
+        # Find the actual matches to determine their order
+        matches = list(re.finditer(
+            r'\b(?:previously|prior|old|before|last|now|updated|new|current|revised|after)\b',
+            text, flags=re.IGNORECASE
+        ))
 
-            # Singles (dollar or percent)
-            if is_percent:
-                prior_single = re.search(percent_single_pat, prior_part)
-                current_single = re.search(percent_single_pat, current_part)
-                if prior_single and current_single:
-                    pv = normalize_number(prior_single.group(1), is_percent=True)[0]
-                    cv = normalize_number(current_single.group(1), is_percent=True)[0]
-                    if pv is not None and cv is not None:
-                        return compare_singles(pv, cv, 'percent')
+        # We need at least two revision signals and three text segments
+        if len(matches) >= 2 and len(parts) >= 3:
+            first_word = matches[-2].group().lower()
+            second_word = matches[-1].group().lower()
+
+            # Determine which segment is prior and which is current
+            if first_word in OLD_SIGNALS and second_word in NEW_SIGNALS:
+                # Old before New → parts[-2] is prior, parts[-1] is current
+                prior_part = parts[-2]
+                current_part = parts[-1]
+            elif first_word in NEW_SIGNALS and second_word in OLD_SIGNALS:
+                # New before Old → parts[-2] is actually current, parts[-1] is prior
+                prior_part = parts[-1]
+                current_part = parts[-2]
             else:
-                prior_single = re.search(single_pat, prior_part)
-                current_single = re.search(single_pat, current_part)
-                if prior_single and current_single:
-                    pv, pu = normalize_number(prior_single.group(1))
-                    cv, cu = normalize_number(current_single.group(1))
-                    if None not in (pv, cv) and pu == cu:
-                        return compare_singles(pv, cv, pu)
+                # Two old or two new signals – unreliable
+                prior_part, current_part = None, None
 
-        # Alternative: "from X to Y" pattern
+            if prior_part and current_part:
+                is_percent = '%' in prior_part or '%' in current_part
+
+                # Try ranges first
+                prior_range = re.search(range_pat, prior_part)
+                current_range = re.search(range_pat, current_part)
+                if prior_range and current_range:
+                    pl, ph, pu = parse_range(prior_range.group(1), is_percent)
+                    cl, ch, cu = parse_range(current_range.group(1), is_percent)
+                    if None not in (pl, ph, cl, ch) and pu == cu:
+                        return compare_ranges(pl, ph, cl, ch, pu)
+
+                # Singles (dollar or percent)
+                if is_percent:
+                    prior_single = re.search(percent_single_pat, prior_part)
+                    current_single = re.search(percent_single_pat, current_part)
+                    if prior_single and current_single:
+                        pv = normalize_number(prior_single.group(1), is_percent=True)[0]
+                        cv = normalize_number(current_single.group(1), is_percent=True)[0]
+                        if pv is not None and cv is not None:
+                            return compare_singles(pv, cv, 'percent')
+                else:
+                    prior_single = re.search(single_pat, prior_part)
+                    current_single = re.search(single_pat, current_part)
+                    if prior_single and current_single:
+                        pv, pu = normalize_number(prior_single.group(1))
+                        cv, cu = normalize_number(current_single.group(1))
+                        if None not in (pv, cv) and pu == cu:
+                            return compare_singles(pv, cv, pu)
+
+        # Alternative: "from X to Y" pattern (unchanged)
         from_to_pat = r'(?:from|previously)\s+(' + single_pat + r')\s*(?:to|now)\s+(' + single_pat + r')'
         from_to = re.search(from_to_pat, text, re.IGNORECASE)
         if from_to:
@@ -209,10 +222,6 @@ def extract_guidance_rich(ticker, as_of_date):
         return None, None
 
     def compare_ranges(old_low, old_high, new_low, new_high, unit):
-        """
-        Compare old and new guidance ranges.
-        Returns (label, evidence_dict).
-        """
         def pct_change(old, new):
             return (new - old) / abs(old) if old != 0 else 0
 
@@ -222,19 +231,17 @@ def extract_guidance_rich(ticker, as_of_date):
         mid_new = (new_low + new_high) / 2
         mid_change = pct_change(mid_old, mid_new)
 
-        # Determine direction based on midpoint change
         if mid_change > 0.02:
-            label = 2  # raise
+            label = 2
         elif mid_change < -0.02:
-            label = 0  # lower
+            label = 0
         else:
-            # If midpoint unchanged, check if bounds moved consistently
             if low_change > 0.02 and high_change > 0.02:
-                label = 2  # overall raise
+                label = 2
             elif low_change < -0.02 and high_change < -0.02:
-                label = 0  # overall lower
+                label = 0
             else:
-                label = 1  # maintain (or mixed)
+                label = 1
 
         evidence = {
             'numerical_revision': True,
@@ -278,13 +285,11 @@ def extract_guidance_rich(ticker, as_of_date):
         main_sent = sentences[main_idx]
         gtype = detect_guidance_type(main_sent)
 
-        # Numerical revision check across paragraph
         para = ' '.join(sentences[max(0, main_idx-1): main_idx+2])
         num_label, num_ev = detect_numerical_revision(para)
         if num_label is not None:
             return (num_label, 'numerical_revision', num_ev, gtype)
 
-        # Keyword classification
         best_label = None
         best_word = None
         best_dist = 9999
@@ -333,9 +338,10 @@ def extract_guidance_rich(ticker, as_of_date):
         return ', '.join(parts) if parts else 'Weak signal'
 
     # ---------- filing search ----------
-    ed_series = load_earnings_dates(ticker)
+    ed_series = earnings_lookup.get(ticker, pd.Series(dtype='datetime64[ns]'))
     past = ed_series[ed_series < pd.Timestamp(as_of_date)]
     if past.empty:
+        print(f"[ERROR] {ticker}: no past data")
         return empty_result()
 
     prior_date = past.sort_values(ascending=False).iloc[0].date()
@@ -346,8 +352,46 @@ def extract_guidance_rich(ticker, as_of_date):
         company = edgar.Company(ticker)
         filings = company.get_filings(form="8-K",
                                       filing_date=f"{start}:{end}")
-    except:
+    except Exception as e:
+        print(f"[ERROR] {ticker}: {e}")
         return empty_result()
+
+    # ---------- helper to process a single text block ----------
+    def process_text(txt, src):
+        """Return list of guidance items found in a single text block (body or exhibit)."""
+        items = []
+        paragraphs = [p.strip() for p in txt.split('\n\n') if p.strip()]
+        if not paragraphs:
+            paragraphs = [txt]
+        for para in paragraphs:
+            for stem in safe_stems + generic_stems:
+                if stem not in para:
+                    continue
+                if stem in generic_stems:
+                    if not (any(re.search(r'\b' + re.escape(m) + r'\b', para) for m in financial_metrics) and
+                            any(re.search(r'\b' + re.escape(rw) + r'\b', para) for rw in revision_signals)):
+                        continue
+                sents = sentence_split(para)
+                if not sents:
+                    continue
+                res = classify_sentence(sents, stem)
+                if res:
+                    label, trigger, ev, gtype = res
+                    main_sent = next((s for s in sents if stem in s), '')
+                    item = {
+                        'label': label,
+                        'stem': stem,
+                        'trigger_word': trigger,
+                        'guidance_type': gtype,
+                        'matched_sentence': main_sent,
+                        'paragraph': para,
+                        'snippet': main_sent[:600] if main_sent else para[:600],
+                        'evidence': ev,
+                        'source': src,
+                        'confidence_score': compute_confidence(ev)
+                    }
+                    items.append(item)
+        return items
 
     # ---------- iterate filings ----------
     best_items = []
@@ -359,7 +403,8 @@ def extract_guidance_rich(ticker, as_of_date):
         try:
             acc = f.accession_number if hasattr(f, 'accession_number') else None
             fd = f.filing_date
-            if hasattr(fd, 'strftime'): fd = fd.strftime('%Y-%m-%d')
+            if hasattr(fd, 'strftime'):
+                fd = fd.strftime('%Y-%m-%d')
         except:
             continue
 
@@ -367,54 +412,31 @@ def extract_guidance_rich(ticker, as_of_date):
         exhibits = []
         try:
             body = f.obj().text()
-        except: pass
+        except Exception as e:
+            print(f"  [WARN] Could not get body text for {ticker}: {e}")
         try:
             for att in f.attachments:
-                if 'EX-99.' in att.document_name:
-                    try: exhibits.append(att.text())
-                    except: pass
-        except: pass
+                # Use document_type, fallback to description if document_type is empty
+                doc_id = getattr(att, 'document_type', '') or getattr(att, 'description', '')
+                if 'EX-99.' in doc_id:
+                    try:
+                        exhibits.append(att.text())
+                    except Exception as e:
+                        print(f"  [WARN] Could not extract exhibit {doc_id}: {e}")
+        except Exception as e:
+            print(f"  [WARN] Error iterating attachments for {ticker}: {e}")
 
         filing_items = []
-        for src, txt in [('body', body)] + [('exhibit', et) for et in exhibits]:
-            if not txt: continue
-            section = txt
-            for code in ['item 2.02', 'item 7.01']:
-                idx = txt.find(code)
-                if idx != -1:
-                    section = txt[idx:]
-                    next_item = re.search(r'\nitem', section[10:])
-                    if next_item: section = section[:10+next_item.start()]
-                    break
-            paragraphs = [p.strip() for p in section.split('\n\n') if p.strip()]
-            if not paragraphs: paragraphs = [section]
-            for para in paragraphs:
-                for stem in safe_stems + generic_stems:
-                    if stem not in para: continue
-                    if stem in generic_stems:
-                        if not (any(re.search(r'\b' + re.escape(m) + r'\b', para) for m in financial_metrics) and
-                                any(re.search(r'\b' + re.escape(rw) + r'\b', para) for rw in revision_signals)):
-                            continue
-                    sents = sentence_split(para)
-                    if not sents: continue
-                    res = classify_sentence(sents, stem)
-                    if res:
-                        label, trigger, ev, gtype = res
-                        main_sent = next((s for s in sents if stem in s), '')
-                        item = {
-                            'label': label,
-                            'stem': stem,
-                            'trigger_word': trigger,
-                            'guidance_type': gtype,
-                            'matched_sentence': main_sent,
-                            'paragraph': para,
-                            'snippet': main_sent[:600] if main_sent else para[:600],
-                            'evidence': ev,
-                            'source': src,
-                            'confidence_score': compute_confidence(ev)
-                        }
-                        filing_items.append(item)
-        if not filing_items: continue
+        if isinstance(body, str):
+            filing_items.extend(process_text(body.lower(), "body"))
+
+        for et in exhibits:
+            if isinstance(et, str):
+                filing_items.extend(process_text(et.lower(), "exhibit"))
+
+        if not filing_items:
+            continue
+
         best_item = max(filing_items, key=lambda x: x['confidence_score'])
         if best_item['confidence_score'] > best_score:
             best_score = best_item['confidence_score']
@@ -423,9 +445,9 @@ def extract_guidance_rich(ticker, as_of_date):
             accession = acc
 
     if not best_items:
+        print(f"error - {ticker} {ed}: no best items")
         return empty_result()
 
-    # best per type
     best_per_type = {}
     for item in best_items:
         gt = item['guidance_type']
@@ -434,7 +456,7 @@ def extract_guidance_rich(ticker, as_of_date):
 
     overall = max(best_items, key=lambda x: x['confidence_score'])
     score = overall['confidence_score']
-    level = 'Very High' if score>=90 else 'High' if score>=70 else 'Medium' if score>=30 else 'Low'
+    level = 'Very High' if score >= 90 else 'High' if score >= 70 else 'Medium' if score >= 30 else 'Low'
 
     return {
         'label': overall['label'],
@@ -449,17 +471,23 @@ def extract_guidance_rich(ticker, as_of_date):
         'accession': accession
     }
 
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 DB_PATH = 'data/universe.db'
-BATCH_SIZE = 200              # rows per run – increase once you see it's stable
-COMMIT_EVERY = 100            # commit to disk every N rows
+BATCH_SIZE = 500
+COMMIT_EVERY = 100
 
-# ---------------------------------------------------------------------------
-# Connect & ensure table exists
-# ---------------------------------------------------------------------------
-conn = sqlite3.connect(DB_PATH)
+conn = sqlite3.connect(
+    DB_PATH,
+    timeout=30,
+    check_same_thread=False
+)
+
+conn.execute("PRAGMA journal_mode=WAL;")
+conn.execute("PRAGMA synchronous=NORMAL;")
+
 c = conn.cursor()
 
 c.execute("""
@@ -470,8 +498,8 @@ c.execute("""
         confidence_score    INTEGER,
         confidence_level    TEXT,
         classification_reason TEXT,
-        guidance_items      TEXT,      -- JSON list of dicts
-        best_per_type       TEXT,      -- JSON dict
+        guidance_items      TEXT,
+        best_per_type       TEXT,
         matched_sentence    TEXT,
         paragraph           TEXT,
         guidance_type       TEXT,
@@ -484,6 +512,20 @@ c.execute("""
     )
 """)
 conn.commit()
+
+# ---------------------------------------------------------------------------
+# Load earnings history ONCE – no per-ticker DB connections
+# ---------------------------------------------------------------------------
+print("Loading earnings history into memory...")
+all_earnings = pd.read_sql(
+    "SELECT ticker, earnings_date FROM earnings_history ORDER BY ticker, earnings_date",
+    conn,
+    parse_dates=['earnings_date']
+)
+earnings_lookup = {}
+for ticker, group in all_earnings.groupby('ticker'):
+    earnings_lookup[ticker] = group['earnings_date'].sort_values().reset_index(drop=True)
+print(f"Loaded earnings history for {len(earnings_lookup)} tickers.")
 
 # ---------------------------------------------------------------------------
 # Select rows that need processing (resumable LEFT JOIN)
@@ -508,18 +550,14 @@ if df_todo.empty:
 
 print(f"Processing {len(df_todo)} rows...")
 
-# ---------------------------------------------------------------------------
-# Process each row
-# ---------------------------------------------------------------------------
 rows_processed = 0
 
 for idx, row in df_todo.iterrows():
     ticker = row['ticker']
     ed = row['earnings_date'].date()
 
-    # --- Extract guidance ---
     try:
-        res = extract_guidance_rich(ticker, ed)
+        res = extract_guidance_rich(ticker, ed, earnings_lookup)
     except Exception as e:
         print(f"  ERROR on {ticker} {ed}: {e}")
         res = {
@@ -533,8 +571,6 @@ for idx, row in df_todo.iterrows():
             'accession': None
         }
 
-    # --- Sort guidance_items by confidence_score descending ---
-    # This ensures the first item is the best candidate.
     if res['guidance_items']:
         res['guidance_items'] = sorted(
             res['guidance_items'],
@@ -544,7 +580,6 @@ for idx, row in df_todo.iterrows():
 
     best = res['guidance_items'][0] if res['guidance_items'] else None
 
-    # --- Serialise JSON fields ---
     guidance_items_json = json.dumps(res['guidance_items']) if res['guidance_items'] else None
     best_per_type_json = json.dumps(res['best_per_type']) if res['best_per_type'] else None
     num_ev_json = (
@@ -553,7 +588,6 @@ for idx, row in df_todo.iterrows():
         else None
     )
 
-    # --- Insert into database ---
     c.execute("""
         INSERT OR REPLACE INTO guidance_datasetv2 (
             ticker, earnings_date, label, confidence_score, confidence_level,
@@ -577,21 +611,15 @@ for idx, row in df_todo.iterrows():
         res['filing_date'],
         res['accession'],
         num_ev_json,
-        None   # raw_section – leave empty for now
+        None
     ))
-
-    # --- Batch commit ---
     if (rows_processed + 1) % COMMIT_EVERY == 0:
         conn.commit()
         print(f"  Committed {rows_processed+1} rows...")
 
     rows_processed += 1
-
-    # Rate limiting to avoid EDGAR blocks
     time.sleep(0.15)
 
-# --- Final commit ---
 conn.commit()
 conn.close()
-
 print(f"Batch complete. {rows_processed} rows inserted/updated.")

@@ -86,14 +86,6 @@ echo [%date% %time%] START  Stage 7 - to_duckdc_cloud.py>>"%LOG%"
 if errorlevel 1 goto Stage7Error
 echo [%date% %time%] FINISH Stage 7>>"%LOG%"
 
-:: ================================================================
-:: Stage 8
-:: ================================================================
-echo [%date% %time%] START  Stage 8 - populate_features_batch_desc.py>>"%LOG%"
-%PYTHON% app\populate_features_batch_desc.py >>"%LOG%" 2>&1
-if errorlevel 1 goto Stage8Error
-echo [%date% %time%] FINISH Stage 8>>"%LOG%"
-
 echo done > "%TODAY_FILE%"
 
 echo [%date% %time%] SUCCESS - Full daily pipeline completed>>"%LOG%"
@@ -131,8 +123,4 @@ exit /b
 
 :Stage7Error
 echo [%date% %time%] ERROR in Stage 7 (to_duckdc_cloud.py)>>"%LOG%"
-exit /b
-
-:Stage8Error
-echo [%date% %time%] ERROR in Stage 8 (populate_features_batch_desc.py)>>"%LOG%"
 exit /b

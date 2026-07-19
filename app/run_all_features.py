@@ -27,6 +27,8 @@ skip_files = {
     'generate_output_dataset.py',
     'guidance_data_asc.py', 
     'guidance_data_desc.py', 
+    'guidance_datav2.py',
+    'feature_guidance_llm',
     'guidance_model.py', 
     'guidance_model_ml_dataset.py', 
     'populate_features_batch asc.py', 

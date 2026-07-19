@@ -20,13 +20,67 @@ def extract_guidance_rich(ticker, as_of_date, earnings_lookup):
     # ---------- constants ----------
     safe_stems = ['guidance', 'outlook', 'forecast']
     generic_stems = ['expect', 'anticipate', 'project']
-    raise_words = ['raise','raises','raised','raising','increase','increases','increased','increasing',
-                   'boost','boosts','boosted','boosting','upgrade','upgrades','upgraded','upgrading',
-                   'upward','higher','stronger','improve','narrow']
-    lower_words = ['lower','lowers','lowered','lowering','decrease','decreases','decreased','decreasing',
-                   'reduce','reduces','reduced','reducing','cut','cuts','cutting','downward','weaker','worsen']
-    maintain_words = ['reaffirm','reaffirms','reaffirmed','reaffirming','maintain','maintains','maintained',
-                      'maintaining','unchanged','no change','consistent with prior']
+    raise_words = [
+        # original single‑word entries
+        'raise','raises','raised','raising','increase','increases','increased','increasing',
+        'boost','boosts','boosted','boosting','upgrade','upgrades','upgraded','upgrading',
+        'upward','higher','stronger','improve','narrow',
+        # new multi‑word phrases
+        "raised guidance", "raising guidance",
+        "increase guidance", "increased guidance",
+        "improved outlook",
+        "better than previously expected",
+        "above prior guidance", "ahead of prior guidance",
+        "expect stronger", "expect higher",
+        "revised upward", "upward revision",
+        "increased forecast", "higher forecast",
+        "boosted outlook", "boosted forecast",
+        "now expects", "expects earnings of", "expects revenue of",
+        "up from prior guidance", "higher than previous guidance",
+        "increased full year outlook", "raised full year outlook",
+    ]
+
+    lower_words = [
+        # original single‑word entries
+        'lower','lowers','lowered','lowering','decrease','decreases','decreased','decreasing',
+        'reduce','reduces','reduced','reducing','cut','cuts','cutting','downward','weaker','worsen',
+        # new multi‑word phrases
+        "lower guidance", "reduced guidance", "cut guidance", "cuts guidance",
+        "lowered forecast", "reduced forecast",
+        "revised downward", "downward revision",
+        "expect lower", "expects lower",
+        "below prior guidance", "below previous guidance",
+        "less than previously expected",
+        "weaker demand", "soft demand",
+        "challenging environment",
+        "reduced outlook", "cut outlook", "lowered outlook",
+        "earnings will be lower", "revenue will be lower",
+        "miss previous guidance",
+        "decrease guidance",
+    ]
+
+    maintain_words = [
+        # original single‑word entries
+        'reaffirm','reaffirms','reaffirmed','reaffirming','maintain','maintains','maintained',
+        'maintaining','unchanged','no change','consistent with prior',
+        # new multi‑word phrases
+        "maintain guidance", "maintaining guidance",
+        "reaffirm guidance", "reaffirmed guidance",
+        "confirm guidance",
+        "unchanged guidance", "guidance remains unchanged",
+        "continues to expect",
+        "still expects",
+        "on track",
+        "comfortable with previous guidance",
+        "within prior guidance",
+        "no change to guidance",
+        "maintaining previous outlook",
+        "reiterated guidance",
+        "reiterates outlook",
+        "guidance unchanged",
+        "our outlook remains",
+        "expectations remain",
+    ]
     revision_signals = ['now','previously','prior','revised','updated']
     financial_metrics = [
         'revenue','sales','eps','earnings','ebitda','margin','fiscal','fy','quarter','growth',
@@ -476,7 +530,7 @@ def extract_guidance_rich(ticker, as_of_date, earnings_lookup):
 # Main
 # ---------------------------------------------------------------------------
 DB_PATH = 'data/universe.db'
-BATCH_SIZE = 500
+BATCH_SIZE = 200000
 COMMIT_EVERY = 100
 
 conn = sqlite3.connect(

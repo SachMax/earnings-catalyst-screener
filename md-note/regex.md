@@ -91,3 +91,18 @@ print(subbed_string)
 
 #output: hello planet, you are the best planet
 ```
+
+### escape
+```py
+import re
+
+user_input = "Google.com"
+
+# Without re.escape(), the dot is a wildcard
+print(re.findall(user_input, "Google1com"))  # Output: ['Google1com']
+
+# With re.escape()
+safe_input = re.escape(user_input)
+print(safe_input)                             # Output: Google\.com
+print(re.findall(safe_input, "Google1com"))  # Output: [] (No match, as expected)
+```

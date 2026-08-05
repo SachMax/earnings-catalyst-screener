@@ -83,8 +83,8 @@ import torch
 
 edgar.set_identity("sachiomaximilliano166@gmail.com")
 
-tokenizer = AutoTokenizer.from_pretrained("./my_guidance_tokenizer")
-model = AutoModelForSequenceClassification.from_pretrained("./my_guidance_model")
+tokenizer = AutoTokenizer.from_pretrained("./artifacts/my_guidance_tokenizer")
+model = AutoModelForSequenceClassification.from_pretrained("./artifacts/my_guidance_model")
 model.eval()   # set to evaluation mode
 
 def analyst_momentum(ticker, as_of_date):
@@ -1771,8 +1771,8 @@ import torch
 import pandas as pd
 
 # Load once at module level (these are already in your file)
-tokenizer = AutoTokenizer.from_pretrained("./my_guidance_tokenizer")
-model = AutoModelForSequenceClassification.from_pretrained("./my_guidance_model")
+tokenizer = AutoTokenizer.from_pretrained("./artifacts/my_guidance_tokenizer")
+model = AutoModelForSequenceClassification.from_pretrained("./artifacts/my_guidance_model")
 model.eval()
 
 def compute_guidance_bert(ticker, as_of_date):

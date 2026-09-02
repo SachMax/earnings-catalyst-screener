@@ -56,6 +56,7 @@ int main() {
     std::vector<Signal> signals;
 
     // create an array containing Signal structs with .ticker and .score
+    // append Signal objects to the vector
     signals.push_back({"NVDA", 0.91});
     signals.push_back({"AMD", 0.82});
     signals.push_back({"AAPL", 0.74});

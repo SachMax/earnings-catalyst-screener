@@ -92,6 +92,7 @@ if df.empty:
     conn.close()
     exit()
 
+print(df.head(5))
 print(f"Processing {len(df)} historical rows...")
 
 def safe_get(val, key=None):

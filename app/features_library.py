@@ -1001,15 +1001,25 @@ def current_earnings_quality(ticker, as_of_date):
     }
 
 def load_price_history(ticker):
-    """Return a DataFrame of all price history for a ticker, or an empty DataFrame."""
-    import sqlite3, pandas as pd
-    conn = sqlite3.connect('data/universe.db')
-    df = pd.read_sql(f"""
-        SELECT date, close_price, volume FROM price_history
-        WHERE ticker = '{ticker}'
-        ORDER BY date
-    """, conn, parse_dates=['date'], index_col='date')
-    conn.close()
+    """Load historical prices for one ticker."""
+
+    with sqlite3.connect("data/universe.db") as conn:
+        df = pd.read_sql_query(
+            """
+            SELECT
+                date,
+                close AS close_price,
+                volume
+            FROM price_history
+            WHERE ticker = ?
+            ORDER BY date
+            """,
+            conn,
+            params=(ticker,),
+            parse_dates=["date"],
+            index_col="date"
+        )
+
     return df
 
 def compute_runup(ticker, as_of_date, df_price):

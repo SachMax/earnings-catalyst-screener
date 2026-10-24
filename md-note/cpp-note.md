@@ -1364,3 +1364,201 @@ std::vector<double> other = std::move(data);
 std::cout << data[0]; 
 ```
 
+## `<fstream>`
+stands for file stream.
+
+streams is basically I/O operations such as `std::cin` (input stream) and `std::cout` (output stream).
+
+a file can also be connected to a stream.
+```bash
+CSV file
+   ↓
+std::ifstream
+   ↓
+your program
+```
+
+### `std::ifstream`
+stands for input file stream
+
+so,
+`std::ifstream file(filepath);` 
+means: Create an input stream called file connected to the file at filepath.
+
+for example,
+`std::ifstream file("data/sample.csv");`
+
+conceptually,
+```bash
+data/sample.csv
+       │
+       ▼
+ ┌─────────────┐
+ │ ifstream    │
+ │    file     │
+ └─────────────┘
+       │
+       ▼
+    C++ program
+```
+Now your program can read information from that file.
+
+### `std::ofstream`
+stands for output file stream
+
+so,
+`std::ofstream file("output.txt");`
+means: allows your program to write to a file.
+
+for example,
+```cpp
+std::ofstream file("output.txt");
+
+file << "Hello\n";
+file << "Trading Engine\n";
+```
+the resulting file would contain,
+Hello
+Trading Engine
+
+### checking if file is open
+```cpp
+std::ifstream file(filepath); //c++ attempts to open the '/file path' then assigned as file
+
+if (!file.is_open()) { // condition: file cannot open
+    throw std::runtime_error("Could not open CSV file: " + filepath);
+}
+```
+
+### reading from a file 
+`std::getline(file, line)`
+similar to 
+`std::getline(std::cin, name);`
+
+suppose a csv file named `"data/close_price.scv"`:
+```csv
+timestamp,open,high,low,close,volume
+2026-09-21,200,205,198,203.5,1500000
+2026-09-22,203.5,208,202,207,1800000
+```
+if you do this,
+```cpp
+std::string line;
+
+std::getline("data/close_price.csv", line);
+// you will get this:
+// timestamp,open,high,low,close,volume
+
+```
+
+## `<sstream>`
+when you extract lines from a csv file, you get this 
+: 2026-09-21,200,205,198,203.5,1500000
+
+you use this library to seperate them
+
+### `std::stringstream`
+just write this `std::stringstream ss(line);`
+
+now, you can extract pieces from ss
+
+### Why not use std::getlineagain?
+Because the file gives us lines, but the line contains multiple fields.
+
+So we do:
+1. Read the line: `std::getline(file, line);`
+2. Break the line into fields: `std::stringstream ss(line);`
+3. `std::getline(ss, field, ',');`
+
+## tiny example 
+```cpp
+#include <iostream>
+#include <sstream>
+#include <string>
+
+int main()
+{
+    std::string line = "AAPL,200.5,1000";
+
+    std::stringstream ss(line);
+
+    std::string ticker;
+    std::string price;
+    std::string volume;
+
+    std::getline(ss, ticker, ',');
+    std::getline(ss, price, ',');
+    std::getline(ss, volume, ',');
+
+    std::cout << ticker << '\n';
+    std::cout << price << '\n';
+    std::cout << volume << '\n';
+}
+
+/*
+output:
+AAPL
+200.5
+1000
+*/
+```
+
+## data type conversion
+
+### string to double
+```cpp
+std::string field = "203.5";
+
+double price = std::stod(field); 
+```
+
+### string to long long
+```cpp
+std::string field = "1500000";
+
+std::int64_t volume = std::stoll(field);
+```
+
+## `std::except` - exceptions
+
+`#include <stdexcept>`
+
+This header provides standard exception classes.
+
+one of the most relevent exceptions: `std::runtime_error`
+meaning: "Something went wrong, and normal execution cannot continue."
+
+### throw
+```cpp
+throw std::runtime_error(
+    "Could not open CSV file: " + filepath
+);
+```
+meaning: Stop normal execution here and report this error to whoever is handling exceptions.
+
+### `try` and `catch`
+this is very similar to python's `try` and `except`
+
+```cpp
+try {
+    ...
+}
+catch (const std::exception& e) {
+    std::cerr << "Error: " << e.what() << '\n';
+}
+```
+
+`std::exception`, is basically like `Exception` in python
+
+`e.what`: returns the error message.
+
+```cpp
+throw std::runtime_error("Could not open CSV file");
+
+catch (const std::exception& e) {
+    std::cout << e.what();
+}
+
+// output: Could not open CSV file
+```
+

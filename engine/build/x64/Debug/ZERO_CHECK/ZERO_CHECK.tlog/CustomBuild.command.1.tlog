@@ -1,0 +1,10 @@
+^C:\USERS\SACHIO\DESKTOP\EARNINGS-CATALYST-SCREENER\ENGINE\BUILD\CMAKEFILES\B4569485AB86BA1EAE8009D8F7E6A2D4\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/Sachio/Desktop/earnings-catalyst-screener/engine -BC:/Users/Sachio/Desktop/earnings-catalyst-screener/engine/build --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file C:/Users/Sachio/Desktop/earnings-catalyst-screener/engine/build/TradingEngine.slnx
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

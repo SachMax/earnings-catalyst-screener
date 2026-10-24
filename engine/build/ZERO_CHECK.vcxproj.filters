@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="18.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\Sachio\Desktop\earnings-catalyst-screener\engine\build\CMakeFiles\b4569485ab86ba1eae8009d8f7e6a2d4\generate.stamp.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{8E2F2DE7-54A7-379A-8DE7-1E9990C7DA86}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

@@ -1,19 +1,36 @@
-cmake_minimum_required(VERSION 4.4) # sets the minimum required version of cmake for the project
-project(Test 
-        VERSION 0.0.17
-        DESCRIPTION "The CMake Testing Platform"
-        LANGUAGES CXX) # to specify the information for the project such as project name, version, description, homepage_url, languages
-add_executable(Test main.cpp) 
-target_compile_features(Test PRIVATE cxx_std_17)
 
-# Variables and printing
-message("hello") # basically this is the print function
-set(NAME "QuantEngine") # to set a variable
-message(${NAME}) # to access the variable
+cmake_minimum_required(VERSION 3.20)
 
-# this is a function
-function(print var)
-        message("${var} = ${${var}}" )
-endfunction()
+project(TradingEngine
+    VERSION 1.0
+    LANGUAGES CXX
+)
 
-print(PROJECT_NAME)
+# Build the portfolio code as a reusable library.
+add_library(TradingEngine
+    src/Portfolio.cpp
+)
+
+# Make the public header directory available to the library
+# and to targets that use it.
+target_include_directories(TradingEngine
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+# Require C++17 for this target and its consumers.
+target_compile_features(TradingEngine
+    PUBLIC
+        cxx_std_17
+)
+
+# Build a separate application that uses the library.
+add_executable(TradingApp
+    apps/main.cpp
+)
+
+# Link the application to the library.
+target_link_libraries(TradingApp
+    PRIVATE
+        TradingEngine
+)

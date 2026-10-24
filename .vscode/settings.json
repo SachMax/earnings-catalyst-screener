@@ -1,5 +1,12 @@
 {
     "editor.suggest.selectionMode": "never",
     "python-envs.defaultEnvManager": "ms-python.python:venv",
-    "cmake.sourceDirectory": "C:/Users/Sachio/Desktop/earnings-catalyst-screener/.venv/Lib/site-packages/pyarrow/src/arrow/python"
+    "cmake.sourceDirectory": "C:/Users/Sachio/Desktop/earnings-catalyst-screener/.venv/Lib/site-packages/pyarrow/src/arrow/python",
+    "python-envs.pythonProjects": [
+        {
+            "path": "md-note/my_game_engine",
+            "envManager": "ms-python.python:venv",
+            "packageManager": "ms-python.python:pip"
+        }
+    ]
 }

@@ -29,10 +29,10 @@ df_ed = pd.read_sql(
 
 def get_close(df, target):
     try:
-        return df.loc[target, 'close_price']
+        return df.loc[target, 'close']
     except KeyError:
         idx = df.index.get_indexer([target], method='ffill')[0]
-        return df.iloc[idx]['close_price']
+        return df.iloc[idx]['close']
 
 for index,row in df_ed.iterrows(): 
     try:

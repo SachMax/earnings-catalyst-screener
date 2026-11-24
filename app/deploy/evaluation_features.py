@@ -137,7 +137,7 @@ for idx, row in df.iterrows():
 
     for num, col, cond in filter_checks:
         res = check_filter(row, col, cond)
-        if res is True:
+        if res is not None and bool(res):
             passed_count += 1
         if res is not None:
             total_available += 1

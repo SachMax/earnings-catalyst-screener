@@ -23,6 +23,11 @@ parser.add_argument(
     action="store_true",
     help="Delete and rebuild price_history from scratch"
 )
+parser.add_argument(
+    "--full-refresh",
+    action="store_true",
+    help="Download maximum history without deleting existing data"
+)
 args = parser.parse_args()
 
 # ---------------------------------------------------------
@@ -93,7 +98,7 @@ for i, ticker in enumerate(tickers, 1):
 
         last_date = c.fetchone()[0]
 
-        if last_date is None:
+        if last_date is None or args.full_refresh:
             # No history exists for this ticker
             hist = stock.history(
                 period="max",

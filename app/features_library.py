@@ -1,3 +1,7 @@
+# POINT-IN-TIME CAUTION: EDGAR financial facts selected by quarter end may
+# include figures filed after a historical cutoff. Do not treat this
+# entire library as leakage-free without filing-availability checks.
+
 # NAME of functions
 # 1. eps_beat(ticker, as_of_date): returns 0, 1, None INTEGER (eps_beat from current earnings quality func)
 # 2. analyst_consensus(ticker, as_of_date): returns consesus_proxy TEXT
@@ -81,213 +85,109 @@ import joblib
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import torch
 
+
+from pathlib import Path
+
+
+def _feature_database_path():
+    """Find the existing DB relative to this source file or project CWD."""
+    here = Path(__file__).resolve().parent
+    candidates = [Path.cwd() / 'data' / 'universe.db'] + [
+        directory / 'data' / 'universe.db'
+        for directory in (here, *here.parents)
+    ]
+    for path in candidates:
+        if path.is_file():
+            return str(path)
+    raise FileNotFoundError('Cannot locate data/universe.db; start from project root')
+
+
+_GUIDANCE_MODEL_CACHE = None
+
+def _get_guidance_model():
+    global _GUIDANCE_MODEL_CACHE
+    if _GUIDANCE_MODEL_CACHE is None:
+        # Resolve the saved model paths from project working directory.
+        tok = AutoTokenizer.from_pretrained('./artifacts/my_guidance_tokenizer')
+        net = AutoModelForSequenceClassification.from_pretrained('./artifacts/my_guidance_model')
+        net.eval()
+        _GUIDANCE_MODEL_CACHE = (tok, net)
+    return _GUIDANCE_MODEL_CACHE
+
 edgar.set_identity("sachiomaximilliano166@gmail.com")
 
-tokenizer = AutoTokenizer.from_pretrained("./artifacts/my_guidance_tokenizer")
-model = AutoModelForSequenceClassification.from_pretrained("./artifacts/my_guidance_model")
-model.eval()   # set to evaluation mode
+# FinBERT loads lazily only if compute_guidance_bert is called.
 
 def analyst_momentum(ticker, as_of_date):
-    import yfinance as yf
-    import pandas as pd
-    from datetime import timedelta
-
-    def rating_tier(grade):
-        grade_lower = str(grade).lower()
-        if grade_lower in ['buy','overweight','outperform']:
-            return 2
-        elif grade_lower in ['hold','neutral','market perform','sector perform']:
-            return 1
-        elif grade_lower in ['sell','underperform','underweight']:
-            return 0
-        return 1
-
+    """Historical rating-action momentum. Do not insert today's recommendationMean."""
+    result = {
+        'recommendation_mean': None,  # no historical consensus snapshot available
+        'upgrade_count': None,
+        'downgrade_count': None,
+        'net_analyst_momentum': None,
+        'has_analyst_coverage': None,
+    }
     try:
-        stock = yf.Ticker(ticker)
-        downgrades = stock.upgrades_downgrades
-        
-        # 1. Check if the historical dataframe itself exists and contains data
-        has_history = downgrades is not None and not downgrades.empty
-        
-        # 2. Check if a general consensus mean exists in stock.info
-        # (Some stocks have historical logs but no active mean, or vice versa)
-        info_dict = stock.info if hasattr(stock, 'info') else {}
-        rec_mean = info_dict.get("recommendationMean")
-        has_mean = rec_mean is not None
-        
-        # 3. Calculate the coverage flag (1 if either indicator proves Wall Street looks at it, else 0)
-        has_analyst_coverage = 1 if (has_history or has_mean) else 0
-
-        # Scenario A: The API works, but there is absolutely no analyst history
-        if not has_history:
-            return {
-                "recommendation_mean": rec_mean,
-                "upgrade_count": 0,
-                "downgrade_count": 0,
-                "net_analyst_momentum": 0,
-                "has_analyst_coverage": has_analyst_coverage,  # Will be 0 (or 1 if only mean exists)
-            }
-
-        # The index can be a DatetimeIndex or a plain integer index.
-        # If it's a DatetimeIndex, use it directly; otherwise, look for a 'date' column.
-        if pd.api.types.is_datetime64_any_dtype(downgrades.index):
-            date_series = downgrades.index
+        ratings = yf.Ticker(ticker).upgrades_downgrades
+        if ratings is None:
+            return result
+        if ratings.empty:
+            return {**result, 'upgrade_count': 0, 'downgrade_count': 0,
+                    'net_analyst_momentum': 0, 'has_analyst_coverage': 0}
+        ratings = ratings.copy()
+        if not isinstance(ratings.index, pd.DatetimeIndex):
+            col = next((c for c in ('date', 'Date', 'filing_date', 'Filing Date')
+                        if c in ratings.columns), None)
+            if col is None:
+                return result
+            ratings.index = pd.to_datetime(ratings[col], errors='coerce', utc=True)
         else:
-            # Try common date columns
-            for col in ['date', 'Date', 'filing_date', 'Filing Date']:
-                if col in downgrades.columns:
-                    date_series = pd.to_datetime(downgrades[col])
-                    break
-            else:
-                # No date column – return neutral
-                return {
-                    'recommendation_mean': rec_mean,
-                    'upgrade_count': 0,
-                    'downgrade_count': 0,
-                    'net_analyst_momentum': 0,
-                    "has_analyst_coverage": has_analyst_coverage
-                }
-
-        last2weeks = pd.Timestamp(as_of_date) - timedelta(days=14)
-        mask = (date_series >= last2weeks) & (date_series < pd.Timestamp(as_of_date))
-        recent = downgrades[mask]
-
-        upgrade_count = 0
-        downgrade_count = 0
-        for _, rrow in recent.iterrows():
-            grade_from = rating_tier(rrow.get('FromGrade', ''))
-            grade_to = rating_tier(rrow.get('ToGrade', ''))
-            if grade_to < grade_from:
-                downgrade_count += 1
-            if grade_to > grade_from:
-                upgrade_count += 1
-
-        net = upgrade_count - downgrade_count
-        return {
-            'recommendation_mean': rec_mean,
-            'upgrade_count': upgrade_count,
-            'downgrade_count': downgrade_count,
-            'net_analyst_momentum': net,
-            "has_analyst_coverage": has_analyst_coverage
-        }
-    
-    except Exception:
-        return {
-            'recommendation_mean': None,
-            'upgrade_count': None,
-            'downgrade_count': None,
-            'net_analyst_momentum': None,
-            "has_analyst_coverage": None
-        }
+            ratings.index = pd.to_datetime(ratings.index, utc=True)
+        cutoff = pd.Timestamp(as_of_date).tz_localize('UTC') if pd.Timestamp(as_of_date).tzinfo is None else pd.Timestamp(as_of_date).tz_convert('UTC')
+        historical = ratings[ratings.index < cutoff]
+        window = historical[historical.index >= cutoff - pd.Timedelta(days=14)]
+        def tier(s):
+            s = str(s).strip().lower()
+            if s in ('buy', 'overweight', 'outperform', 'strong buy'): return 2
+            if s in ('hold', 'neutral', 'market perform', 'sector perform', 'equal-weight'): return 1
+            if s in ('sell', 'underperform', 'underweight', 'strong sell'): return 0
+            return None
+        up = down = 0
+        for _, r in window.iterrows():
+            before, after = tier(r.get('FromGrade')), tier(r.get('ToGrade'))
+            if before is None or after is None:
+                continue
+            up += after > before
+            down += after < before
+        return {'recommendation_mean': None,
+                'upgrade_count': int(up), 'downgrade_count': int(down),
+                'net_analyst_momentum': int(up - down),
+                'has_analyst_coverage': int(not historical.empty)}
+    except Exception as exc:
+        print(f'analyst_momentum({ticker}, {as_of_date}): {exc}')
+        return result
 
 def analyst_consensus(ticker, as_of_date):
-    import yfinance as yf
-
-    mom = analyst_momentum(ticker, as_of_date)
-    consensus_proxy = 1 if (mom and mom['net_analyst_momentum'] and mom['net_analyst_momentum'] > 0) else 0
-    return consensus_proxy
+    """Unavailable without point-in-time consensus data; not a rating-action proxy."""
+    return None
 
 
 def analyst_revision(ticker, as_of_date):
-    def rating_tier(grade):
-        grade_lower = str(grade).lower()
-        if grade_lower in ['buy','overweight','outperform']:
-            return 2   # bullish
-        elif grade_lower in ['hold','neutral','market perform','sector perform']:
-            return 1   # neutral
-        elif grade_lower in ['sell','underperform','underweight']:
-            return 0   # bearish
-        return 1  # unknown -> treat as neutral
-    try:
-        stock = yf.Ticker(ticker)
-        downgrades = stock.upgrades_downgrades
-        if downgrades is None or downgrades.empty:
-            return {
-                "upward_revision_count60d": None,
-                "downward_revision_count60d": None,
-                "net_revision_count_60d": None,
-                "revision_breadth_60d": 0.5,
-                "revision_trend_label": None,
-                "estimate_revision_pct": None,
-            }
-        if not pd.api.types.is_datetime64_any_dtype(downgrades.index):
-            return {
-                "upward_revision_count60d": None,
-                "downward_revision_count60d": None,
-                "net_revision_count_60d": None,
-                "revision_breadth_60d": 0.5,
-                "revision_trend_label": None,
-                "estimate_revision_pct": None,
-            }
-        last60days = pd.Timestamp(as_of_date) - timedelta(days=60)
-        mask = (downgrades.index >= last60days) & (downgrades.index < pd.Timestamp(as_of_date))
-        recent = downgrades[mask]
-        downgrade_count = 0
-        upgrade_count = 0
-        breadth = None
-        net_revision_count_60d = None
-        label = None
-        for _, rrow in recent.iterrows():
-            grade_from = rating_tier(rrow.get('FromGrade', ''))
-            grade_to = rating_tier(rrow.get('ToGrade', ''))
-            if grade_to < grade_from:
-                downgrade_count += 1
-            if grade_to > grade_from:
-                upgrade_count += 1
-        if downgrade_count and upgrade_count:
-            net_revision_count_60d = upgrade_count - downgrade_count
-            breadth = upgrade_count / (upgrade_count + downgrade_count)
-        else:
-            upgrade_count = None
-            downgrade_count = None
-            breadth = 0.5
-        if net_revision_count_60d is not None:
-            if net_revision_count_60d > 3 and breadth > 0.7:
-                label = "Strong Positive"
-            elif net_revision_count_60d > 0:
-                label = "Positive"
-            elif net_revision_count_60d == 0:
-                label = "Neutral"
-            elif net_revision_count_60d < 0 and breadth < 0.3:
-                label = "Strong Negative"
-            else:
-                label = "Negative"
-        else:
-            label = "No Revision Data"
+    """Historical revisions to an EPS estimate need point-in-time estimate snapshots.
 
-        earnings = stock.earnings_dates
-        revision_pct = None
-        if earnings is not None and not earnings.empty:
-            # Sort descending so most recent quarters are first
-            earnings_sorted = earnings.sort_index(ascending=False)
-            # Upcoming quarter: no reported EPS yet
-            upcoming = earnings_sorted[earnings_sorted['Reported EPS'].isna()].head(1)
-            if not upcoming.empty:
-                current_est = upcoming['EPS Estimate'].iloc[0]
-                # Most recently completed quarter: has a reported EPS
-                completed = earnings_sorted[earnings_sorted['Reported EPS'].notna()].head(1)
-                if not completed.empty:
-                    prev_est = completed['EPS Estimate'].iloc[0]   # final estimate for that quarter
-                    if pd.notna(current_est) and pd.notna(prev_est) and prev_est != 0:
-                        revision_pct = round((current_est - prev_est) / abs(prev_est) * 100, 2)
-        dictionary = {
-            'upward_revision_count60d': upgrade_count,
-            'downward_revision_count60d': downgrade_count,
-            'net_revision_count_60d': net_revision_count_60d,
-            'revision_breadth_60d': breadth,
-            'revision_trend_label': label,
-            'estimate_revision_pct': revision_pct
-        }
-        return dictionary
-    except Exception:
-        return {
-                "upward_revision_count60d": None,
-                "downward_revision_count60d": None,
-                "net_revision_count_60d": None,
-                "revision_breadth_60d": 0.5,
-                "revision_trend_label": None,
-                "estimate_revision_pct": None,
-            }
+    yfinance.upgrades_downgrades provides analyst rating changes, NOT
+    revisions to the same quarter's EPS or revenue consensus. These rating
+    changes are tracked separately by analyst_momentum(). Returning None
+    here prevents mislabeled historical training features.
+    """
+    return {
+        'upward_revision_count60d': None,
+        'downward_revision_count60d': None,
+        'net_revision_count_60d': None,
+        'revision_breadth_60d': None,
+        'revision_trend_label': None,
+        'estimate_revision_pct': None,
+    }
 
 def historical_earnings_quality(ticker, as_of_date):
     """
@@ -340,7 +240,7 @@ def historical_earnings_quality(ticker, as_of_date):
         stock = yf.Ticker(ticker)
     except:
         return None
-    
+
     sector = None
     try:
         stock = yf.Ticker(ticker)
@@ -377,6 +277,7 @@ def historical_earnings_quality(ticker, as_of_date):
     sbc_pcts = []
     ocf_nis = []
     fcf_pos_quarters = 0
+    fcf_observed_quarters = 0
     yoy_growth_streak = 0
     streak_alive = True
 
@@ -489,7 +390,7 @@ def historical_earnings_quality(ticker, as_of_date):
             if rev_growth_latest is not None and rev_growth_latest > 0.20:
                 monetisation_latest = 1
             elif capex is not None and revenue_latest is not None and revenue_latest > 0:
-                if (capex / revenue_latest) < 0.05:
+                if (abs(capex) / revenue_latest) < 0.05:
                     monetisation_latest = 1
 
         # ---- YoY growth streak ----
@@ -505,10 +406,12 @@ def historical_earnings_quality(ticker, as_of_date):
         # ---- Component scoring ----
         components = []
         # Gross margin
-        if all(v is not None for v in [revenue_latest, cost_of_rev_latest, revenue_prev, cost_of_rev_prev]):
+        if (all(v is not None and pd.notna(v) for v in
+                [revenue_latest, cost_of_rev_latest, revenue_prev, cost_of_rev_prev])
+                and revenue_latest > 0 and revenue_prev > 0):
             gm_latest = ((revenue_latest - cost_of_rev_latest) / revenue_latest) * 100
             gm_prev = ((revenue_prev - cost_of_rev_prev) / revenue_prev) * 100
-            gm_change = round(gm_latest - gm_prev, 2)
+            gm_change = round((gm_latest - gm_prev) * 100, 2)  # basis points
             gm_changes.append(gm_change)
             if gm_change >= 100: components.append(3)
             elif gm_change >= 0: components.append(2)
@@ -538,9 +441,10 @@ def historical_earnings_quality(ticker, as_of_date):
             components.append(2)
 
         # FCF positivity
-        if capex is not None:
-            fcf = ocf + capex if ocf is not None else None
-            fcf_pos = 1 if (fcf is not None and fcf > 0) else 0
+        if capex is not None and ocf is not None:
+            fcf_observed_quarters += 1
+            fcf = ocf - abs(capex)
+            fcf_pos = 1 if fcf > 0 else 0
             if fcf_pos == 1:
                 components.append(3)
                 fcf_pos_quarters += 1
@@ -560,7 +464,7 @@ def historical_earnings_quality(ticker, as_of_date):
         avg_ocf = round(np.mean(ocf_nis), 2) if ocf_nis else None
         if avg_ocf is not None and np.isnan(avg_ocf):
             avg_ocf = None
-        fcf_pos_count = fcf_pos_quarters if fcf_pos_quarters > 0 else None
+        fcf_pos_count = fcf_pos_quarters if fcf_observed_quarters else None
 
         available = sum([avg_gm is not None, avg_sbc is not None,
                          avg_ocf is not None, fcf_pos_count is not None])
@@ -695,6 +599,7 @@ def current_earnings_quality(ticker, as_of_date):
 
     # ---------------- 1. Try yfinance for EPS surprise ----------------
     eps_beat = None
+    latest = None
     try:
         stock = yf.Ticker(ticker)
         ed = stock.earnings_dates
@@ -813,24 +718,18 @@ def current_earnings_quality(ticker, as_of_date):
         except (IndexError, ValueError):
             pass
 
-    # If yfinance didn't give a beat, try EDGAR YoY growth
-    if eps_beat is None:
-        if eps_latest is not None and eps_prev is not None and eps_prev != 0:
-            eps_beat = 1 if eps_latest > eps_prev else 0
+    # Do NOT treat year-over-year EPS growth as an analyst EPS beat.
+    # Missing point-in-time consensus stays unknown (None).
     # EPS surprise percentage (continuous)
     eps_surprise_pct = None
-    if 'latest' in dir() and latest is not None:
+    if latest is not None:
         surprise_val = latest.get('Surprise(%)')
         if surprise_val is not None and pd.notna(surprise_val):
             eps_surprise_pct = surprise_val
-    # Fallback: YoY EPS growth from EDGAR
-    if eps_surprise_pct is None and eps_latest is not None and eps_prev is not None and eps_prev != 0:
-        eps_surprise_pct = round(((eps_latest - eps_prev) / abs(eps_prev)) * 100, 2)
+    # Do not substitute YoY EPS growth for EPS surprise.
 
-    # Revenue surprise (continuous YoY growth proxy)
+    # Revenue surprise requires historical consensus estimates, not YoY growth.
     revenue_surprise_pct = None
-    if revenue_latest is not None and revenue_prev is not None and revenue_prev > 0:
-        revenue_surprise_pct = round(((revenue_latest - revenue_prev) / revenue_prev) * 100, 2)
 
     # ---------------- 4. cash flow items ----------------
     cf_latest_q = valid_cf_cols[0] if valid_cf_cols else None
@@ -918,10 +817,12 @@ def current_earnings_quality(ticker, as_of_date):
 
     # ---------------- 6. compute derived metrics ----------------
     gm_change_bps = None
-    if all(v is not None for v in [revenue_latest, cost_of_rev_latest, revenue_prev, cost_of_rev_prev]):
+    if (all(v is not None and pd.notna(v) for v in
+            [revenue_latest, cost_of_rev_latest, revenue_prev, cost_of_rev_prev])
+            and revenue_latest > 0 and revenue_prev > 0):
         gm_latest = ((revenue_latest - cost_of_rev_latest) / revenue_latest) * 100
         gm_prev = ((revenue_prev - cost_of_rev_prev) / revenue_prev) * 100
-        gm_change_bps = round(gm_latest - gm_prev, 2)
+        gm_change_bps = round((gm_latest - gm_prev) * 100, 2)
 
     sbc_pct = None
     if sbc_q is not None and revenue_latest is not None and revenue_latest > 0:
@@ -933,13 +834,12 @@ def current_earnings_quality(ticker, as_of_date):
 
     fcf_positive = None
     if capex is not None and ocf is not None:
-        fcf = ocf + capex
+        # Treat capex as expenditure magnitude, regardless of source sign.
+        fcf = ocf - abs(capex)
         fcf_positive = 1 if fcf > 0 else 0
 
-    # GAAP profitability (requires ni, sbc_pct)
-    gaap_profit = None
-    if ni is not None and sbc_pct is not None:
-        gaap_profit = 1 if (ni > 0 and sbc_pct < 3.0) else 0
+    # GAAP profitability is based on GAAP net income, independent of SBC%.
+    gaap_profit = int(ni > 0) if ni is not None and pd.notna(ni) else None
 
     # ---------------- 7. component scoring ----------------
     components = []
@@ -981,11 +881,12 @@ def current_earnings_quality(ticker, as_of_date):
     quality_map = {'High': 3, 'Medium': 2, 'Low': 1}
     score = quality_map[quality]
 
-    revenue_beat = 1 if (revenue_latest is not None and revenue_prev is not None and
-                         revenue_prev > 0 and revenue_latest > revenue_prev) else 0
-    
+    # No historical analyst revenue estimate in this function.
+    revenue_beat = None
+
     return {
-        'quality': quality,
+        'quality': score,  # numeric: matches ml_dataset.quality_curr INTEGER
+        'quality_label': quality,
         'score': score,
         'revenue_latest': revenue_latest,
         'revenue_prev': revenue_prev,
@@ -1001,59 +902,57 @@ def current_earnings_quality(ticker, as_of_date):
     }
 
 def load_price_history(ticker):
-    """Load historical prices for one ticker."""
-
-    with sqlite3.connect("data/universe.db") as conn:
+    """Get daily OHLCV. Preserve 'close_price' for existing feature functions."""
+    with sqlite3.connect(_feature_database_path()) as conn:
         df = pd.read_sql_query(
-            """
-            SELECT
-                date,
-                close AS close_price,
-                volume
-            FROM price_history
-            WHERE ticker = ?
-            ORDER BY date
-            """,
+            """SELECT date, open, high, low, close,
+                      close AS close_price, volume
+                 FROM price_history
+                WHERE ticker = ?
+                ORDER BY date""",
             conn,
             params=(ticker,),
-            parse_dates=["date"],
-            index_col="date"
+            parse_dates=['date'],
+            index_col='date',
         )
-
     return df
 
 def compute_runup(ticker, as_of_date, df_price):
-    """Return pre‑earnings run‑up (%). df_price must contain all history for the ticker."""
-    if df_price.empty or len(df_price) < 15:
+    """Pre-event price change: prior close at T-14 calendar days to T-2."""
+    if df_price is None or df_price.empty:
         return None
-    d14 = as_of_date - timedelta(days=14)
-    d2  = as_of_date - timedelta(days=2)
-    try:
-        close_before = df_price.loc[:d2].iloc[-1]['close_price']
-        close_start  = df_price.loc[:d14].iloc[-1]['close_price']
-        if close_start == 0: return None
-        return round(((close_before - close_start) / close_start) * 100, 2)
-    except:
+    cutoff = pd.Timestamp(as_of_date).normalize()
+    start = df_price.loc[:cutoff - pd.Timedelta(days=14), 'close_price'].dropna()
+    end = df_price.loc[:cutoff - pd.Timedelta(days=2), 'close_price'].dropna()
+    if start.empty or end.empty:
         return None
+    p0, p1 = float(start.iloc[-1]), float(end.iloc[-1])
+    if not (np.isfinite(p0) and np.isfinite(p1)) or p0 <= 0 or p1 <= 0:
+        return None
+    if start.index[-1] >= end.index[-1]:
+        return None
+    return round((p1 / p0 - 1) * 100, 2)
 
 def compute_rsi(ticker, as_of_date, df_price):
-    if df_price.empty or len(df_price) < 15:
+    """14-session RSI using simple moving averages (matches original convention)."""
+    if df_price is None or df_price.empty:
         return None
-    delta = df_price['close_price'].diff()
-    gain = delta.clip(lower=0)
-    loss = -delta.clip(upper=0)
-    avg_gain = gain.rolling(14).mean()
-    avg_loss = loss.rolling(14).mean()
-    RS = avg_gain / avg_loss
-    RSI = 100 - (100 / (1 + RS))
-    # Get the last RSI value on or before as_of_date
-    rsi_series = RSI.loc[:pd.Timestamp(as_of_date - timedelta(days=1))]
-    if rsi_series.empty:
+    close = df_price.loc[:pd.Timestamp(as_of_date) - pd.Timedelta(days=1), 'close_price'].dropna()
+    if len(close) < 15:
         return None
-    latest_rsi = round(rsi_series.iloc[-1], 2)
-    if pd.isna(latest_rsi):
+    delta = close.diff()
+    gains = delta.clip(lower=0).rolling(14).mean()
+    losses = -delta.clip(upper=0).rolling(14).mean()
+    gain, loss = gains.iloc[-1], losses.iloc[-1]
+    if pd.isna(gain) or pd.isna(loss):
         return None
-    return round(latest_rsi, 2)
+    if gain == 0 and loss == 0:
+        return 50.0
+    if loss == 0:
+        return 100.0
+    if gain == 0:
+        return 0.0
+    return round(float(100 - 100 / (1 + gain / loss)), 2)
 
 def compute_volume_ratio(ticker, as_of_date, df_price):
     if df_price.empty:
@@ -1078,149 +977,82 @@ def compute_volume_ratio(ticker, as_of_date, df_price):
     return ratio
 
 def load_earnings_dates(ticker):
-    import sqlite3, pandas as pd
-    conn = sqlite3.connect('data/universe.db')
-    df = pd.read_sql(f"""
-        SELECT earnings_date FROM earnings_history
-        WHERE ticker = '{ticker}'
-        ORDER BY earnings_date
-    """, conn, parse_dates=['earnings_date'])
-    conn.close()
+    """Return chronologically sorted known earnings-event dates."""
+    with sqlite3.connect(_feature_database_path()) as conn:
+        df = pd.read_sql_query(
+            """SELECT earnings_date FROM earnings_history
+                WHERE ticker = ? ORDER BY earnings_date""",
+            conn, params=(ticker,), parse_dates=['earnings_date'],
+        )
     if df.empty:
         return pd.Series(dtype='datetime64[ns]')
-    return df['earnings_date']
+    return df['earnings_date'].dropna().sort_values().reset_index(drop=True)
 
 def compute_past_earnings_action(ticker, as_of_date, df_price, df_ed):
-    def get_close_prev(df, target):
-        try:
-            return df.loc[target, 'close_price']
-        except KeyError:
-            idx = df.index.get_indexer([target], method='ffill')[0]
-            return df.iloc[idx]['close_price']
+    """Past event reactions only when the full 20-session response is observable.
 
-    if df_price.empty or df_ed.empty:
-        return None
-
-    # Past earnings dates ≤ as_of_date
-    earnings_hist = df_ed
-    past = earnings_hist[earnings_hist < pd.Timestamp(as_of_date)]
-    if len(past) < 2:
-        return None
-
-    recent = past.sort_index().tail(4)   # Series of datetime dates
-
-    historical_action = []   # Surge & Hold / Fade / Drop
-    reactions = []           # "pullback and bounce" / "no bounce"
-    drift_values = []
-    pullback_bounce_sum = 0.0
-
-    for ed_date in recent:
-        d0 = ed_date.date()
-        d1 = d0 + timedelta(days=1)
-        d5 = d0 + timedelta(days=5)
-
-        # ------- Past earnings action (Surge & Hold / Fade / Drop) -------
-        try:
-            close0 = get_close_prev(df_price, d0)
-            idx1 = df_price.index.get_indexer([d1], method='bfill')[0]
-            idx5 = df_price.index.get_indexer([d5], method='ffill')[0]
-
-            if idx1 < 0 or idx1 >= len(df_price) or idx5 >= len(df_price):
-                continue
-            close1 = df_price['close_price'].iloc[idx1]
-            close5 = df_price['close_price'].iloc[idx5]
-            if pd.isna(close0) or pd.isna(close1) or pd.isna(close5) or close0 == 0:
-                continue
-            return01 = (close1 - close0) / close0 * 100
-
-            if return01 > 0:
-                initial_gain = close1 - close0
-                loss_from_peak = max(0, close1 - close5)
-                gave_back = loss_from_peak > 0.5 * initial_gain
-                label = 'Fade' if gave_back else 'Surge & Hold'
-            else:
-                label = 'Drop'
-            historical_action.append(label)
-        except:
-            pass
-
-        # ------- Pullback & Bounce -------
-        try:
-            idx1_pb = df_price.index.get_indexer([d1], method='bfill')[0]
-            window20 = df_price.iloc[idx1_pb : idx1_pb + 20]
-            if len(window20) < 20:
-                continue
-            first5 = window20.iloc[:5]
-            post_high = first5['close_price'].max()
-            high_date = first5[first5['close_price'] == post_high].index[0]
-            high_pos = window20.index.get_loc(high_date)
-
-            remaining = window20.iloc[high_pos + 1:]
-            if remaining.empty:
-                continue
-            pull_back = remaining['close_price'].min()
-            final_close = window20['close_price'].iloc[-1]
-            pullback_pct = (pull_back - post_high) / post_high
-            if pullback_pct <= -0.02 and final_close > post_high:
-                reactions.append('pullback and bounce')
-                pullback_bounce_sum += pullback_pct
-            else:
-                reactions.append('no bounce')
-        except:
-            pass
-
-        try:
-            earnings_date = ed_date
-            idx = df_price.index.get_indexer([earnings_date], method="ffill")[0]
-            if idx < 0 or idx + 10 >= len(df_price):
-                print(f"{ticker} - not enough data")
-                continue
-            close_start = df_price['close_price'].iloc[idx]
-            idx10 = idx + 10
-            close_end = df_price['close_price'].iloc[idx10]
-
-            if pd.isna(close_start) or pd.isna(close_end) or close_start == 0:
-                print(f"{ticker}: invalid price data for {earnings_date}, skipping event")
-                continue
-
-            value = ((close_end - close_start)/close_start)*100
-            drift_values.append(value)
-        except:
-            pass
-
-    # ----- After processing all 4 events, summarise -----
-    if len(historical_action) < 2:
-        surge_count = fade_count = drop_count = pct_surge = most_common_action = None
-    else:
-        surge_count = historical_action.count('Surge & Hold')
-        fade_count = historical_action.count('Fade')
-        drop_count = historical_action.count('Drop')
-        total_hist = len(historical_action)
-        pct_surge = round(surge_count / total_hist, 2) if total_hist else None
-        most_common_action = max(historical_action, key=historical_action.count)
-
-    if len(reactions) < 2:
-        pb_count = avg_depth = most_common_reaction = None
-    else:
-        pb_count = reactions.count('pullback and bounce')
-        avg_depth = round((pullback_bounce_sum * 100) / pb_count, 2) if pb_count > 0 else None
-        most_common_reaction = max(reactions, key=reactions.count)
-
-    if len(drift_values) < 2:
-            print(f"{ticker}: not enough data")
-            avg_drift = None
-    else:
-        avg_drift = round(float(np.mean(drift_values)), 2)
+    Uses the close before the earnings date and sessions strictly AFTER it;
+    report timings (pre-market vs after-hours) require a separate timestamp
+    to make this a true execution-day response feature.
+    """
+    keys = ('surge_hold_count', 'fade_count', 'drop_count',
+            'past_earnings_action', 'pct_surge', 'pullback_bounce_count',
+            'avg_pullback_depth', 'past_pullback_bounce', 'post_earnings_drift')
+    empty = dict.fromkeys(keys)
+    if df_price is None or df_price.empty or df_ed is None or df_ed.empty:
+        return empty
+    cutoff = pd.Timestamp(as_of_date).normalize()
+    prices = df_price.loc[:cutoff - pd.Timedelta(days=1), 'close_price'].dropna()
+    if prices.empty:
+        return empty
+    dates = pd.to_datetime(df_ed, errors='coerce').dropna()
+    past_dates = dates[dates < cutoff].sort_values(ascending=False)
+    labels, reactions, depths, drifts = [], [], [], []
+    for event in past_dates:
+        if len(labels) >= 4:
+            break
+        event = pd.Timestamp(event).normalize()
+        baseline = prices[prices.index < event]
+        future = prices[prices.index > event]
+        # Require the entire response window to be strictly before cutoff.
+        if baseline.empty or len(future) < 20:
+            continue
+        p0 = float(baseline.iloc[-1])
+        post = future.iloc[:20]
+        p1, p5, p10 = map(float, (post.iloc[0], post.iloc[4], post.iloc[9]))
+        if p0 <= 0 or not all(np.isfinite(x) and x > 0 for x in (p1, p5, p10)):
+            continue
+        if p1 > p0:
+            gave_back = (p1 - p5) > 0.5 * (p1 - p0)
+            labels.append('Fade' if gave_back else 'Surge & Hold')
+        else:
+            labels.append('Drop')
+        peak = float(post.iloc[:5].max())
+        peak_pos = int(np.argmax(post.iloc[:5].to_numpy()))
+        following = post.iloc[peak_pos + 1:]
+        if following.empty or peak <= 0:
+            reactions.append('no bounce')
+        else:
+            lowest = float(following.min())
+            pullback_pct = (lowest / peak - 1) * 100
+            bounced = pullback_pct <= -2 and float(post.iloc[-1]) > peak
+            reactions.append('pullback and bounce' if bounced else 'no bounce')
+            if bounced:
+                depths.append(pullback_pct)
+        drifts.append((p10 / p0 - 1) * 100)
+    if len(labels) < 2:
+        return empty
+    surge = labels.count('Surge & Hold')
     return {
-        'surge_hold_count': surge_count,
-        'fade_count': fade_count,
-        'drop_count': drop_count,
-        'past_earnings_action': most_common_action,
-        'pct_surge': pct_surge,
-        'pullback_bounce_count': pb_count,
-        'avg_pullback_depth': avg_depth,
-        'past_pullback_bounce': most_common_reaction,
-        'post_earnings_drift': avg_drift
+        'surge_hold_count': surge,
+        'fade_count': labels.count('Fade'),
+        'drop_count': labels.count('Drop'),
+        'past_earnings_action': max(set(labels), key=lambda x: (labels.count(x), x)),
+        'pct_surge': round(surge / len(labels), 2),
+        'pullback_bounce_count': reactions.count('pullback and bounce'),
+        'avg_pullback_depth': round(float(np.mean(depths)), 2) if depths else None,
+        'past_pullback_bounce': max(set(reactions), key=lambda x: (reactions.count(x), x)),
+        'post_earnings_drift': round(float(np.mean(drifts)), 2) if drifts else None,
     }
     
 def compute_prior_guidance_raised(ticker, as_of_date):
@@ -1307,75 +1139,45 @@ def compute_prior_guidance_raised(ticker, as_of_date):
     return None
 
 def compute_sector_relative_strength(ticker, as_of_date, df_price):
-    import yfinance as yf
-    import pandas as pd
-    import numpy as np
+    """Compute historical stock-vs-SPY momentum.
 
-    sector_to_etf = {
-        "Financial Services": "XLF",
-        "Technology": "XLK",
-        "Consumer Defensive": "XLP",
-        "Consumer Cyclical": "XLY",
-        "Healthcare": "XLV",
-        "Energy": "XLE",
-        "Industrials": "XLI",
-        "Basic Materials": "XLB",
-        "Utilities": "XLU",
-        "Real Estate": "XLRE",
-        "Communication Services": "XLC",
-        "Consumer Staples": "XLP"
-    }
-
-    if df_price.empty:
-        return None
-
-    pre_data = df_price.loc[:pd.Timestamp(as_of_date - timedelta(days=1))]
-    stock = yf.Ticker(ticker)
-    sector = stock.info.get('sector', None)
-    etf = sector_to_etf.get(sector)
-    if etf is None:
-        return None                     # sector truly unknown – feature undefined
-
-    # Default neutral values if data fetch fails
-    sector_ret = 0.0
-    spy_ret    = 0.0
-    stock_ret  = 0.0
-
+    Sector-dependent results intentionally unavailable without point-in-time
+    sector membership. Legacy result keys are retained for the backfill.
+    """
+    empty = {'stock_vs_spy_20d': None,
+             'stock_vs_sector_20d': None,
+             'sector_spy_return_ratio': None}
+    if df_price is None or df_price.empty:
+        return empty
+    close = df_price.loc[:pd.Timestamp(as_of_date) - pd.Timedelta(days=1), 'close_price'].dropna()
+    if len(close) < 21:
+        return empty
+    end = pd.Timestamp(as_of_date).normalize()
+    begin = end - pd.Timedelta(days=60)
     try:
-        start = as_of_date - pd.offsets.BDay(20)
-        xlk = yf.download(etf, start=start, end=(as_of_date - timedelta(days=1)), progress=False)
-        spy = yf.download('SPY', start=start, end=(as_of_date - timedelta(days=1)), progress=False)
-
-        if not xlk.empty and not spy.empty:
-            # Force to 1‑D Series (in case of MultiIndex columns)
-            xlk_close = xlk['Close'].squeeze().dropna()
-            spy_close = spy['Close'].squeeze().dropna()
-            if len(xlk_close) >= 2 and len(spy_close) >= 2:
-                xlk_start = float(xlk_close.iloc[0])
-                xlk_end   = float(xlk_close.iloc[-1])
-                spy_start = float(spy_close.iloc[0])
-                spy_end   = float(spy_close.iloc[-1])
-                sector_ret = (xlk_end / xlk_start - 1) * 100
-                spy_ret    = (spy_end / spy_start - 1) * 100
-    except:
-        pass   # keep defaults of 0.0
-
-    try:
-        pre = pre_data[pre_data.index >= start]
-        # Force to Series and drop NaN
-        pre_close = pre['close_price'].squeeze().dropna()
-        if len(pre_close) >= 2:
-            stock_start = float(pre_close.iloc[0])
-            stock_end   = float(pre_close.iloc[-1])
-            stock_ret   = (stock_end / stock_start - 1) * 100
-    except:
-        pass
-
-    return {
-        "stock_vs_spy_20d": round(float(stock_ret - spy_ret), 2),
-        "stock_vs_sector_20d": round(float(stock_ret - sector_ret), 2),
-        "sector_spy_return_ratio": round(sector_ret - spy_ret, 2)
-    }
+        spy = yf.download('SPY', start=begin, end=end,
+                          auto_adjust=False, progress=False)
+        if spy is None or spy.empty:
+            return empty
+        spy_close = spy['Close']
+        if isinstance(spy_close, pd.DataFrame):
+            spy_close = spy_close.iloc[:, 0]
+        spy_close = spy_close.dropna().astype(float)
+        # Align on common actual sessions; prevents mismatched date endpoints.
+        joined = pd.concat([close.rename('stock'), spy_close.rename('spy')], axis=1,
+                           join='inner').dropna().tail(21)
+        if len(joined) < 21:
+            return empty
+        stock_p0, stock_p1 = joined['stock'].iloc[0], joined['stock'].iloc[-1]
+        spy_p0, spy_p1 = joined['spy'].iloc[0], joined['spy'].iloc[-1]
+        if stock_p0 <= 0 or spy_p0 <= 0:
+            return empty
+        stock_ret = (stock_p1 / stock_p0 - 1) * 100
+        spy_ret = (spy_p1 / spy_p0 - 1) * 100
+        return {**empty, 'stock_vs_spy_20d': round(float(stock_ret - spy_ret), 2)}
+    except Exception as exc:
+        print(f'compute_sector_relative_strength({ticker}, {as_of_date}): {exc}')
+        return empty
     
 def compute_sue(ticker, as_of_date):
     """Return SUE (Standardized Unexpected Earnings) for the most recent quarter."""
@@ -1479,197 +1281,139 @@ def compute_seasonality_match(ticker, as_of_date, df_price, ed_series):
     return 1 if current_sign == hist_sign else 0
 
 def compute_insider_transactions(ticker, as_of_date, max_filings=50):
-    import edgar
-    import datetime
-
+    """Only Form 4s FILED before as_of_date; fetch a dated set first."""
+    cutoff = pd.Timestamp(as_of_date).date()
+    end = cutoff - timedelta(days=1)
+    start = end - timedelta(days=90)
     try:
-        company = edgar.Company(ticker)
-        form4s = company.get_filings(form="4").head(max_filings)
-    except:
+        filings = edgar.Company(ticker).get_filings(
+            form='4', filing_date=f'{start.isoformat()}:{end.isoformat()}'
+        ).head(max_filings)
+    except Exception as exc:
+        print(f'compute_insider_transactions({ticker}, {as_of_date}): {exc}')
         return None
-
-    total_buy_value = 0.0
-    total_sell_value = 0.0
-    buy_count = 0
-    sell_count = 0
-    filing_count = 0
-
-    for f in form4s:
-        # Robust handling: filing_date may be date or datetime
-        filing_dt = f.filing_date
-        if isinstance(filing_dt, datetime.datetime):
-            filing_date = filing_dt.date()
-        else:
-            filing_date = filing_dt   # already a datetime.date
-
-        if filing_date >= as_of_date:
-            continue   # skip future filings
-
+    buys = sells = 0
+    buy_value = sell_value = 0.0
+    saw_usable = False
+    for filing in filings:
+        filed = pd.Timestamp(filing.filing_date).date()
+        if not start <= filed < cutoff:
+            continue
         try:
-            ownership = f.obj()
-            summary = ownership.get_ownership_summary()
+            summary = filing.obj().get_ownership_summary()
             if summary is None:
                 continue
-            if summary.primary_activity == 'Purchase':
-                total_buy_value += summary.net_value
-                buy_count += 1
-            elif summary.primary_activity == 'Sale':
-                total_sell_value += abs(summary.net_value)
-                sell_count += 1
-            filing_count += 1
-        except:
+            activity = str(summary.primary_activity).lower()
+            amount = summary.net_value
+            if amount is None or not np.isfinite(float(amount)):
+                continue
+            saw_usable = True
+            if activity == 'purchase':
+                buys += 1
+                buy_value += abs(float(amount))
+            elif activity == 'sale':
+                sells += 1
+                sell_value += abs(float(amount))
+        except Exception:
             continue
-
-    if filing_count == 0:
+    if not saw_usable:
         return None
-
-    net_value = total_buy_value - total_sell_value
-    insider_flag = 1 if net_value > 0 else 0
-    return {
-        'insider_flag': insider_flag,
-        'net_value': round(net_value, 2),
-        'buy_count': buy_count,
-        'sell_count': sell_count
-    }
+    net = buy_value - sell_value
+    return {'insider_flag': int(net > 0), 'net_value': round(net, 2),
+            'buy_count': buys, 'sell_count': sells}
 
 def compute_eps_rev_streak(ticker, as_of_date, ed_series):
-    past = ed_series[ed_series < pd.Timestamp(as_of_date)]
-    if past.empty:
-        return {'revenue_streak': 0, 'eps_streak': 0}
+    """EPS actual-vs-consensus beat streak known prior to the cutoff.
 
-    recent = past.sort_values(ascending=False).head(4)
-    rev_streak = 0
-    eps_streak = 0
-    rev_alive = True
-    eps_alive = True
-
-    for d in recent:
-        res = current_earnings_quality(ticker, d.date())
-        if res is None:
-            break
-
-        if rev_alive:
-            if res.get('revenue_beat') == 1:
-                rev_streak += 1
+    Historical revenue consensus is unavailable: revenue_streak stays None.
+    Zero means a known miss; None means the data is unavailable.
+    """
+    result = {'revenue_streak': None, 'eps_streak': None}
+    try:
+        dates = yf.Ticker(ticker).earnings_dates
+        if dates is None or dates.empty or 'Surprise(%)' not in dates.columns:
+            return result
+        dates = dates.copy()
+        dates.index = pd.to_datetime(dates.index, utc=True)
+        cutoff = pd.Timestamp(as_of_date)
+        cutoff = cutoff.tz_localize('UTC') if cutoff.tzinfo is None else cutoff.tz_convert('UTC')
+        earlier = dates[dates.index < cutoff].sort_index(ascending=False)
+        if earlier.empty:
+            return result
+        streak = 0
+        for surprise in earlier['Surprise(%)'].head(4):
+            if pd.isna(surprise):
+                break
+            if float(surprise) > 0:
+                streak += 1
             else:
-                rev_alive = False
-
-        if eps_alive:
-            if res.get('eps_beat') == 1:
-                eps_streak += 1
-            else:
-                eps_alive = False
-
-        if not rev_alive and not eps_alive:
-            break   # both streaks ended, no need to look further back
-
-    return {
-        'revenue_streak': rev_streak,
-        'eps_streak': eps_streak
-    }
+                break
+        return {'revenue_streak': None, 'eps_streak': streak}
+    except Exception as exc:
+        print(f'compute_eps_rev_streak({ticker}, {as_of_date}): {exc}')
+        return result
 
 def get_market_context(as_of_date):
-    import yfinance as yf
-    import pandas as pd
-
-    try:
-        # Use market data strictly before the announcement
-        end_date = as_of_date - pd.Timedelta(days=1)
-        start_date = end_date - pd.Timedelta(days=5)
-
-        vix = yf.download('^VIX', start=start_date, end=end_date, progress=False)
-        oil = yf.download('CL=F', start=start_date, end=end_date, progress=False)
-
-        vix_level = None
-        oil_move = None
-
-        if not vix.empty:
-            vix_level = round(float(vix['Close'].iloc[-1].item()), 2)
-
-        if not oil.empty and len(oil) >= 2:
-            prev = float(oil['Close'].iloc[-2].item())
-            curr = float(oil['Close'].iloc[-1].item())
-            if prev != 0:
-                oil_move = round((curr / prev - 1) * 100, 2)
-
-        return {'vix_level': vix_level, 'oil_move_1d': oil_move}
-    except:
-        return None
+    """VIX close and 1-day oil move from sessions strictly preceding date."""
+    cutoff = pd.Timestamp(as_of_date).normalize()
+    start = cutoff - pd.Timedelta(days=15)
+    result = {'vix_level': None, 'oil_move_1d': None}
+    for ticker, key in (('^VIX', 'vix_level'), ('CL=F', 'oil_move_1d')):
+        try:
+            data = yf.download(ticker, start=start, end=cutoff,
+                               auto_adjust=False, progress=False)
+            if data is None or data.empty:
+                continue
+            closes = data['Close']
+            if isinstance(closes, pd.DataFrame):
+                closes = closes.iloc[:, 0]
+            closes = closes.dropna().astype(float)
+            if key == 'vix_level' and len(closes) >= 1:
+                result[key] = round(float(closes.iloc[-1]), 2)
+            if key == 'oil_move_1d' and len(closes) >= 2:
+                old, new = float(closes.iloc[-2]), float(closes.iloc[-1])
+                if old > 0 and new > 0:
+                    result[key] = round((new / old - 1) * 100, 2)
+        except Exception as exc:
+            print(f'get_market_context({ticker}, {as_of_date}): {exc}')
+    return result
     
 def compute_pct_from_52wlow(ticker, as_of_date, df_price):
-    if df_price.empty:
+    """Percentage above lowest observed low over approximately 52 weeks."""
+    if df_price is None or df_price.empty:
         return None
-
-    # Use prices strictly before the announcement
-    pre_data = df_price.loc[:pd.Timestamp(as_of_date - timedelta(days=1))]
-
-    if len(pre_data) < 100:   # not enough history
+    cutoff = pd.Timestamp(as_of_date) - pd.Timedelta(days=1)
+    window = df_price.loc[:cutoff].tail(252)
+    if len(window) < 100:
         return None
-
-    df_window = pre_data.tail(260)   # roughly one year of trading days
-    high_52w = df_window['close_price'].max()
-    low_52w = df_window['close_price'].min()
-    current_price = df_window['close_price'].iloc[-1]
-
-    if high_52w == low_52w:
+    low_column = 'low' if 'low' in window.columns else 'close_price'
+    low = window[low_column].min()
+    latest_close = window['close_price'].iloc[-1]
+    if pd.isna(low) or pd.isna(latest_close) or low <= 0:
         return None
-
-    pct = ((current_price - low_52w) / (high_52w - low_52w)) * 100
-    return round(pct, 2)
+    return round((float(latest_close) / float(low) - 1) * 100, 2)
 
 def compute_market_cap_features(ticker, as_of_date, df_price):
+    """Do not mix today's share count with a historical price.
+
+    Add a point-in-time shares-outstanding table before enabling these fields.
     """
-    Returns:
-    {
-        'market_cap_bucket': bucket,
-        'log_market_cap': log_market_cap
-    }
-    """
-    try:
-        stock = yf.Ticker(ticker)
-        shares = stock.info.get("sharesOutstanding")
-        pre_data = df_price.loc[:pd.Timestamp(as_of_date - timedelta(days=1))]
-        close = pre_data.iloc[-1]["close_price"]
-        if shares is None or pre_data.empty or pd.isna(close):
-            return {
-            "market_cap_bucket": None,
-            "log_market_cap": None
-            }
-        market_cap = close * shares
-        market_cap_bil = market_cap / 1e9
-        if market_cap_bil >= 200:
-            bucket = "mega"
-        elif market_cap_bil >= 50:
-            bucket = "large"
-        elif market_cap_bil >= 10:
-            bucket = "mid"
-        elif market_cap_bil >= 2:
-            bucket = "small"
-        else:
-            bucket = "micro"
-        return {
-            "market_cap_bucket": bucket,
-            "log_market_cap": round(float(np.log1p(market_cap_bil)), 6),
-        }
-    except Exception:
-        return {
-            "market_cap_bucket": None,
-            "log_market_cap": None
-            }
+    return {'market_cap_bucket': None, 'log_market_cap': None}
     
-def compute_sector_industry(ticker):
+def compute_sector_industry(ticker, as_of_date=None):
+    """For historical backfills, requires point-in-time classification history.
+
+    Pass as_of_date=historical_event_date from the backfill script. No current
+    classification is used for historical events.
+    """
+    if as_of_date is not None:
+        return {'sector': None, 'industry': None}
     try:
-        stock = yf.Ticker(ticker)
-        info = stock.info
-        return {
-            "sector": info.get("sector"),
-            "industry": info.get("industry"),
-        }
-    except Exception:
-        return {
-            "sector": None,
-            "industry": None
-        }
+        info = yf.Ticker(ticker).info
+        return {'sector': info.get('sector'), 'industry': info.get('industry')}
+    except Exception as exc:
+        print(f'compute_sector_industry({ticker}): {exc}')
+        return {'sector': None, 'industry': None}
     
 def compute_momentum_features(as_of_date, df_price):
     try:
@@ -1727,132 +1471,81 @@ def compute_volatility_features(as_of_date, df_price):
         }
 
 def compute_volatility_percentile(ticker, as_of_date, df_price, hist_years=2):
-    if df_price.empty:
+    """Rank current 20-return annualized HV against past 20-return HV values."""
+    if df_price is None or df_price.empty:
         return None
-    pre_data = df_price.loc[:pd.Timestamp(as_of_date - timedelta(days=1))]
-
-    if pre_data.empty or len(pre_data) < 63:
+    cutoff = pd.Timestamp(as_of_date).normalize()
+    closes = df_price.loc[:cutoff - pd.Timedelta(days=1), 'close_price'].dropna()
+    if len(closes) < 126:
         return None
-
-    # Current HV20 (from existing function)
-    current_vol = compute_volatility_features(as_of_date, df_price)
-    if current_vol is None or current_vol.get('volatility_20d') is None:
+    daily_returns = closes.pct_change()
+    hv20_series = daily_returns.rolling(20).std() * np.sqrt(252) * 100
+    current = hv20_series.iloc[-1]
+    if pd.isna(current) or not np.isfinite(current):
         return None
-
-    hv20_current = current_vol['volatility_20d']
-
-    # Build historical distribution of HV20
-    hv20_history = []
-    end_date = as_of_date - timedelta(days=1)
-    start_date = end_date - timedelta(days=hist_years * 365)
-
-    lookback_data = pre_data.loc[start_date:end_date]
-    if len(lookback_data) < 126:
+    start = cutoff - pd.Timedelta(days=365 * hist_years)
+    # The current observation must not rank against itself.
+    historical = hv20_series[(hv20_series.index >= start) &
+                             (hv20_series.index < hv20_series.index[-1])].dropna()
+    if len(historical) < 20:
         return None
-
-    window_start = 0
-    close_prices = lookback_data['close_price']
-    dates = close_prices.index
-    while window_start + 20 <= len(close_prices):   # fixed to <= to capture final window
-        window = close_prices.iloc[window_start:window_start + 20]
-        returns = window.pct_change().dropna()
-        if len(returns) >= 19:
-            vol = returns.std() * np.sqrt(252) * 100
-            if not pd.isna(vol):
-                hv20_history.append(vol)
-        window_start += 5
-
-    if len(hv20_history) < 20:
-        return None
-
-    hv20_history = np.array(hv20_history)
-
-    percentile = (np.sum(hv20_history < hv20_current) / len(hv20_history)) * 100
-    high_vol_regime = 1 if percentile >= 80.0 else 0
-
-    return {
-        'hv20_current': round(hv20_current, 2),
-        'vol_percentile': round(percentile, 2),
-        'high_vol_regime': high_vol_regime
-    }
+    percentile = float((historical < current).mean() * 100)
+    return {'hv20_current': round(float(current), 2),
+            'vol_percentile': round(percentile, 2),
+            'high_vol_regime': int(percentile >= 80)}
 
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import torch
 import pandas as pd
 
-# Load once at module level (these are already in your file)
-tokenizer = AutoTokenizer.from_pretrained("./artifacts/my_guidance_tokenizer")
-model = AutoModelForSequenceClassification.from_pretrained("./artifacts/my_guidance_model")
-model.eval()
+# FinBERT loads lazily only if compute_guidance_bert is called.
 
 def compute_guidance_bert(ticker, as_of_date):
+    """Score historical Item 2.02 guidance snippets with the stored classifier.
+
+    Keeps original maximum-snippet aggregation for backward compatibility;
+    note that this may be overconfident as snippet count grows.
     """
-    Find all guidance‑related snippets in the most recent 8‑K before as_of_date,
-    run FinBERT on each individually, and return the MAXIMUM raise probability.
-    """
-    # ----- 1. Find the most recent earnings date before as_of_date -----
     ed_series = load_earnings_dates(ticker)
-    past_dates = ed_series[ed_series < pd.Timestamp(as_of_date)]
-    if past_dates.empty:
+    cutoff = pd.Timestamp(as_of_date).normalize()
+    older = ed_series[ed_series < cutoff]
+    if older.empty:
         return -1
-    prior_date = past_dates.sort_values(ascending=False).iloc[0].date()
-
-    # ----- 2. Fetch the 8‑K for that date -----
+    day = pd.Timestamp(older.max()).date()
     try:
-        company = edgar.Company(ticker)
-        filings = company.get_filings(form="8-K", filing_date=f"{prior_date}:{prior_date}")
-    except:
+        filings = edgar.Company(ticker).get_filings(form='8-K',
+                    filing_date=f'{day.isoformat()}:{day.isoformat()}')
+    except Exception as exc:
+        print(f'compute_guidance_bert({ticker}): {exc}')
         return -1
-
-    # ----- 3. Helper: check for Item 2.02 -----
-    def has_item(filing, item_code):
-        if filing.items is None:
-            return False
-        if isinstance(filing.items, str):
-            return item_code in filing.items
-        return any(item_code in str(it) for it in filing.items)
-
-    # ----- 4. Expanded keyword list -----
-    keywords = [
-        "guidance", "outlook", "forecast", "expects", "expect",
-        "projects", "projected", "raises", "raising", "reaffirms",
-        "affirms", "maintains", "updates", "financial outlook",
-        "sees", "anticipates"
-    ]
-
-    all_scores = []
-
-    for f in filings:
-        if not has_item(f, '2.02'):
-            continue
+    keywords = ('guidance', 'outlook', 'forecast', 'expects', 'expect',
+                'projects', 'projected', 'raises', 'raising', 'reaffirms',
+                'affirms', 'maintains', 'updates', 'financial outlook',
+                'sees', 'anticipates')
+    snippets = set()
+    for filing in filings:
         try:
-            text = f.obj().text().lower()
-        except:
+            items = str(filing.items)
+            if '2.02' not in items or pd.Timestamp(filing.filing_date).date() >= cutoff.date():
+                continue
+            text = filing.obj().text().lower()
+            for keyword in keywords:
+                pos = 0
+                while True:
+                    i = text.find(keyword, pos)
+                    if i == -1:
+                        break
+                    snippets.add(text[max(0, i-300):min(len(text), i+500)])
+                    pos = i + len(keyword)
+        except Exception:
             continue
-
-        # Scan for every occurrence of every keyword
-        for kw in keywords:
-            start = 0
-            while True:
-                idx = text.find(kw, start)
-                if idx == -1:
-                    break
-                # Extract the same window size used during training (300 before, 500 after)
-                snippet_start = max(0, idx - 300)
-                snippet_end = min(len(text), idx + 500)
-                snippet = text[snippet_start:snippet_end]
-
-                # ----- Tokenize and predict -----
-                inputs = tokenizer(snippet, truncation=True, return_tensors="pt")
-                with torch.no_grad():
-                    outputs = model(**inputs)
-                    probs = torch.softmax(outputs.logits, dim=-1)
-                    raise_prob = probs[0, 1].item()
-                all_scores.append(raise_prob)
-
-                start = idx + 1   # move past this occurrence
-
-    # ----- 5. Return max score, or -1 if no snippets were found -----
-    if not all_scores:
+    if not snippets:
         return -1
-    return max(all_scores)
+    tokenizer, model = _get_guidance_model()
+    scores = []
+    for snippet in snippets:
+        tokens = tokenizer(snippet, truncation=True, return_tensors='pt')
+        with torch.no_grad():
+            logits = model(**tokens).logits
+            scores.append(float(torch.softmax(logits, dim=-1)[0, 1]))
+    return max(scores)

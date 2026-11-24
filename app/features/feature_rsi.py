@@ -35,7 +35,7 @@ for index,row in df_ed.iterrows():
         print(f"no data in {ticker}, skipping...")
         continue
 
-    delta = df['close_price'].diff()
+    delta = df['close'].diff()
 
     gain = delta.clip(lower=0)
     loss = -delta.clip(upper=0)

@@ -96,10 +96,12 @@ conn.commit()
 df = pd.read_sql("""
     SELECT ticker, earnings_date
     FROM ml_dataset
-    WHERE quality_curr IS NULL
-      AND earnings_date BETWEEN date('now') AND ?
-    ORDER BY earnings_date
-""", conn, params=(cutoff.strftime("%Y-%m-%d"),), parse_dates=['earnings_date'])
+    WHERE earnings_date BETWEEN date('now') AND ?
+    ORDER BY earnings_date, ticker
+""", conn,
+    params=(cutoff.strftime("%Y-%m-%d"),),
+    parse_dates=['earnings_date']
+)
 
 if df.empty:
     print("No new rows to populate. Everything up to date.")

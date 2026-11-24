@@ -63,9 +63,9 @@ for index,row in df_ed.iterrows():
             if idx < 0 or idx + 10 >= len(df):
                 print(f"{ticker} - not enough data")
                 continue
-            close_start = df['close_price'].iloc[idx]
+            close_start = df['close'].iloc[idx]
             idx10 = idx + 10
-            close_end = df['close_price'].iloc[idx10]
+            close_end = df['close'].iloc[idx10]
 
             if pd.isna(close_start) or pd.isna(close_end) or close_start == 0:
                 print(f"{ticker}: invalid price data for {earnings_date}, skipping event")

@@ -1,0 +1,880 @@
+[Tue 11/17/2026 15:36:59.42] DAILY RUN STARTED
+[Tue 11/17/2026 15:36:59.43] START app\data_pipeline\update_price_history.py
+Total tickers: 7165
+Progress: 1/7165
+A: 20 rows inserted/updated, 0 rejected
+AA: 20 rows inserted/updated, 0 rejected
+$AACB: possibly delisted; no price data found  (1d 2026-04-21 -> 2026-11-17)
+AACB: no data
+$AACBR: possibly delisted; no price data found  (1d 1927-12-12 -> 2026-11-17)
+AACBR: no data
+$AACBU: possibly delisted; no price data found  (1d 1927-12-12 -> 2026-11-17)
+AACBU: no data
+AACG: 20 rows inserted/updated, 0 rejected
+AACI: 20 rows inserted/updated, 0 rejected
+AACIU: 20 rows inserted/updated, 0 rejected
+AACIW: 1 rows inserted/updated, 0 rejected
+AACO: 20 rows inserted/updated, 0 rejected
+AACOU: 20 rows inserted/updated, 0 rejected
+AACOW: Period 'max' is invalid, must be one of: 1d, 5d
+AACOW: no data
+AACP: 20 rows inserted/updated, 0 rejected
+AACPR: 20 rows inserted/updated, 0 rejected
+AACPU: 20 rows inserted/updated, 0 rejected
+AACPW: Period 'max' is invalid, must be one of: 1d, 5d
+AACPW: no data
+AAL: 21 rows inserted/updated, 0 rejected
+AAME: 21 rows inserted/updated, 0 rejected
+AAMI: 20 rows inserted/updated, 0 rejected
+AAOI: 21 rows inserted/updated, 0 rejected
+AAON: 20 rows inserted/updated, 0 rejected
+AAP: 20 rows inserted/updated, 0 rejected
+AAPG: 20 rows inserted/updated, 0 rejected
+AAPL: 21 rows inserted/updated, 0 rejected
+AARD: 20 rows inserted/updated, 0 rejected
+AAT: 20 rows inserted/updated, 0 rejected
+AAUC: 20 rows inserted/updated, 0 rejected
+AB: 20 rows inserted/updated, 0 rejected
+ABAT: 20 rows inserted/updated, 0 rejected
+ABBV: 20 rows inserted/updated, 0 rejected
+ABCB: 20 rows inserted/updated, 0 rejected
+ABCL: 20 rows inserted/updated, 0 rejected
+ABEO: 20 rows inserted/updated, 0 rejected
+ABEV: 20 rows inserted/updated, 0 rejected
+ABG: 20 rows inserted/updated, 0 rejected
+ABLV: 20 rows inserted/updated, 0 rejected
+ABLVW: 0 rows inserted/updated, 1 rejected
+ABM: 20 rows inserted/updated, 0 rejected
+ABNB: 20 rows inserted/updated, 0 rejected
+ABOS: 20 rows inserted/updated, 0 rejected
+ABR: 20 rows inserted/updated, 0 rejected
+HTTP Error 404: {"quoteSummary":{"result":null,"error":{"code":"Not Found","description":"Quote not found for symbol: ABR-D"}}}
+$ABR-D: possibly delisted; no timezone found
+ABR-D: no data
+HTTP Error 404: {"quoteSummary":{"result":null,"error":{"code":"Not Found","description":"Quote not found for symbol: ABR-E"}}}
+$ABR-E: possibly delisted; no timezone found
+ABR-E: no data
+$ABR-F: possibly delisted; no timezone found
+ABR-F: no data
+ABSI: 20 rows inserted/updated, 0 rejected
+ABT: 20 rows inserted/updated, 0 rejected
+ABTC: split detected, refreshing full history
+ABTC: 20 rows inserted/updated, 0 rejected
+ABTS: 20 rows inserted/updated, 0 rejected
+ABUS: 20 rows inserted/updated, 0 rejected
+ABVC: 20 rows inserted/updated, 0 rejected
+$ABVE: possibly delisted; no price data found  (1d 1927-12-12 -> 2026-11-17)
+ABVE: no data
+$ABVEW: possibly delisted; no price data found  (1d 1927-12-12 -> 2026-11-17)
+ABVEW: no data
+ABVX: 20 rows inserted/updated, 0 rejected
+ABX: 20 rows inserted/updated, 0 rejected
+ABXL: 20 rows inserted/updated, 0 rejected
+ACA: 3 rows inserted/updated, 0 rejected
+ACAA: 20 rows inserted/updated, 0 rejected
+ACAAU: 20 rows inserted/updated, 0 rejected
+ACAAW: Period 'max' is invalid, must be one of: 1d, 5d
+ACAAW: no data
+ACAD: 20 rows inserted/updated, 0 rejected
+ACB: 20 rows inserted/updated, 0 rejected
+ACCL: 20 rows inserted/updated, 0 rejected
+ACCO: 20 rows inserted/updated, 0 rejected
+ACCS: 20 rows inserted/updated, 0 rejected
+ACDC: 20 rows inserted/updated, 0 rejected
+ACEL: 20 rows inserted/updated, 0 rejected
+ACET: 20 rows inserted/updated, 0 rejected
+ACFN: 20 rows inserted/updated, 0 rejected
+ACGC: 20 rows inserted/updated, 0 rejected
+ACGCU: 20 rows inserted/updated, 0 rejected
+ACGCW: 20 rows inserted/updated, 0 rejected
+ACGL: 20 rows inserted/updated, 0 rejected
+ACGLN: 20 rows inserted/updated, 0 rejected
+ACGLO: 20 rows inserted/updated, 0 rejected
+ACH: 20 rows inserted/updated, 0 rejected
+ACHC: 20 rows inserted/updated, 0 rejected
+ACHR: 21 rows inserted/updated, 0 rejected
+ACHV: 20 rows inserted/updated, 0 rejected
+ACI: 20 rows inserted/updated, 0 rejected
+ACIC: 20 rows inserted/updated, 0 rejected
+ACIU: 20 rows inserted/updated, 0 rejected
+ACIW: 20 rows inserted/updated, 0 rejected
+ACLS: 20 rows inserted/updated, 0 rejected
+ACM: 20 rows inserted/updated, 0 rejected
+ACMR: 20 rows inserted/updated, 0 rejected
+ACN: 20 rows inserted/updated, 0 rejected
+ACNB: 20 rows inserted/updated, 0 rejected
+ACNT: 20 rows inserted/updated, 0 rejected
+ACOG: 20 rows inserted/updated, 0 rejected
+ACON: 20 rows inserted/updated, 0 rejected
+ACONW: 0 rows inserted/updated, 1 rejected
+ACP: 20 rows inserted/updated, 0 rejected
+$ACP-A: possibly delisted; no timezone found
+ACP-A: no data
+ACR: 20 rows inserted/updated, 0 rejected
+$ACR-C: possibly delisted; no timezone found
+ACR-C: no data
+$ACR-D: possibly delisted; no timezone found
+ACR-D: no data
+ACRE: 20 rows inserted/updated, 0 rejected
+ACRS: 20 rows inserted/updated, 0 rejected
+ACRV: 20 rows inserted/updated, 0 rejected
+Progress: 100/7165
+ACT: 20 rows inserted/updated, 0 rejected
+ACTG: 20 rows inserted/updated, 0 rejected
+ACTU: 20 rows inserted/updated, 0 rejected
+ACU: 20 rows inserted/updated, 0 rejected
+ACV: 20 rows inserted/updated, 0 rejected
+ACVA: 1 rows inserted/updated, 0 rejected
+ACXP: 20 rows inserted/updated, 0 rejected
+AD: 20 rows inserted/updated, 0 rejected
+ADAC: 20 rows inserted/updated, 0 rejected
+ADACU: 20 rows inserted/updated, 0 rejected
+ADACW: Period 'max' is invalid, must be one of: 1d, 5d
+ADACW: no data
+ADAG: 20 rows inserted/updated, 0 rejected
+ADAM: 20 rows inserted/updated, 0 rejected
+ADAMG: 20 rows inserted/updated, 0 rejected
+ADAMH: 20 rows inserted/updated, 0 rejected
+ADAMI: 20 rows inserted/updated, 0 rejected
+ADAML: 20 rows inserted/updated, 0 rejected
+ADAMM: 20 rows inserted/updated, 0 rejected
+ADAMN: 20 rows inserted/updated, 0 rejected
+ADAMO: 20 rows inserted/updated, 0 rejected
+ADAMZ: 20 rows inserted/updated, 0 rejected
+ADBE: 20 rows inserted/updated, 0 rejected
+ADC: 20 rows inserted/updated, 0 rejected
+$ADC-A: possibly delisted; no timezone found
+ADC-A: no data
+ADCT: 20 rows inserted/updated, 0 rejected
+ADEA: 21 rows inserted/updated, 0 rejected
+ADGM: split detected, refreshing full history
+ADGM: 576 rows inserted/updated, 0 rejected
+ADI: 20 rows inserted/updated, 0 rejected
+ADIL: 6 rows inserted/updated, 0 rejected
+ADM: 20 rows inserted/updated, 0 rejected
+ADMA: 20 rows inserted/updated, 0 rejected
+ADNT: 20 rows inserted/updated, 0 rejected
+ADP: 20 rows inserted/updated, 0 rejected
+ADPT: 20 rows inserted/updated, 0 rejected
+ADSE: 20 rows inserted/updated, 0 rejected
+ADSEW: 0 rows inserted/updated, 1 rejected
+ADSK: 20 rows inserted/updated, 0 rejected
+ADT: 20 rows inserted/updated, 0 rejected
+ADTN: 20 rows inserted/updated, 0 rejected
+ADTX: 10 rows inserted/updated, 1 rejected
+ADUR: 20 rows inserted/updated, 0 rejected
+ADUS: 20 rows inserted/updated, 0 rejected
+ADV: 20 rows inserted/updated, 0 rejected
+ADVB: 20 rows inserted/updated, 0 rejected
+ADX: 20 rows inserted/updated, 0 rejected
+ADXN: 20 rows inserted/updated, 0 rejected
+AEAQ: 20 rows inserted/updated, 0 rejected
+AEAQU: 20 rows inserted/updated, 0 rejected
+AEAQW: Period 'max' is invalid, must be one of: 1d, 5d
+AEAQW: no data
+AEBI: 20 rows inserted/updated, 0 rejected
+AEC: 20 rows inserted/updated, 0 rejected
+AEE: 20 rows inserted/updated, 0 rejected
+AEF: 20 rows inserted/updated, 0 rejected
+AEFC: 20 rows inserted/updated, 0 rejected
+AEG: 20 rows inserted/updated, 0 rejected
+AEHL: split detected, refreshing full history
+AEHL: 20 rows inserted/updated, 0 rejected
+AEHR: 20 rows inserted/updated, 0 rejected
+AEI: 20 rows inserted/updated, 0 rejected
+AEIS: 20 rows inserted/updated, 0 rejected
+AEM: 20 rows inserted/updated, 0 rejected
+AEMD: split detected, refreshing full history
+AEMD: 20 rows inserted/updated, 0 rejected
+AENT: 20 rows inserted/updated, 0 rejected
+AEO: 20 rows inserted/updated, 0 rejected
+AEON: 20 rows inserted/updated, 0 rejected
+AEP: 20 rows inserted/updated, 0 rejected
+AER: 20 rows inserted/updated, 0 rejected
+AERO: 20 rows inserted/updated, 0 rejected
+AERT: 20 rows inserted/updated, 0 rejected
+AERTW: 0 rows inserted/updated, 1 rejected
+AES: 20 rows inserted/updated, 0 rejected
+AESI: 20 rows inserted/updated, 0 rejected
+AEVA: 20 rows inserted/updated, 0 rejected
+AEXA: 20 rows inserted/updated, 0 rejected
+AEYE: 20 rows inserted/updated, 0 rejected
+AFB: 20 rows inserted/updated, 0 rejected
+AFCG: 20 rows inserted/updated, 0 rejected
+AFG: 20 rows inserted/updated, 0 rejected
+AFGB: 20 rows inserted/updated, 0 rejected
+AFGC: 20 rows inserted/updated, 0 rejected
+AFGD: 20 rows inserted/updated, 0 rejected
+AFGE: 20 rows inserted/updated, 0 rejected
+AFJK: 20 rows inserted/updated, 0 rejected
+AFJKR: Period 'max' is invalid, must be one of: 1d, 5d
+AFJKR: no data
+AFJKU: 20 rows inserted/updated, 0 rejected
+AFL: 20 rows inserted/updated, 0 rejected
+AFRI: 20 rows inserted/updated, 0 rejected
+AFRIW: 0 rows inserted/updated, 1 rejected
+AFRM: 20 rows inserted/updated, 0 rejected
+AFYA: 20 rows inserted/updated, 0 rejected
+AG: 20 rows inserted/updated, 0 rejected
+AGBK: 20 rows inserted/updated, 0 rejected
+AGCC: 20 rows inserted/updated, 0 rejected
+AGCO: 20 rows inserted/updated, 0 rejected
+AGD: 20 rows inserted/updated, 0 rejected
+AGEN: 20 rows inserted/updated, 0 rejected
+AGI: 20 rows inserted/updated, 0 rejected
+AGIG: 20 rows inserted/updated, 0 rejected
+AGIO: 20 rows inserted/updated, 0 rejected
+AGL: 20 rows inserted/updated, 0 rejected
+Progress: 200/7165
+AGM: 20 rows inserted/updated, 0 rejected
+$AGM-D: possibly delisted; no timezone found
+AGM-D: no data
+$AGM-E: possibly delisted; no timezone found
+AGM-E: no data
+$AGM-F: possibly delisted; no timezone found
+AGM-F: no data
+$AGM-G: possibly delisted; no timezone found
+AGM-G: no data
+$AGM-H: possibly delisted; no timezone found
+AGM-H: no data
+$AGM-I: possibly delisted; no timezone found
+AGM-I: no data
+AGMB: 20 rows inserted/updated, 0 rejected
+AGMH: 20 rows inserted/updated, 0 rejected
+AGNC: 21 rows inserted/updated, 0 rejected
+AGNCL: 20 rows inserted/updated, 0 rejected
+AGNCM: 20 rows inserted/updated, 0 rejected
+AGNCN: 20 rows inserted/updated, 0 rejected
+AGNCO: 20 rows inserted/updated, 0 rejected
+AGNCP: 20 rows inserted/updated, 0 rejected
+AGNCZ: 20 rows inserted/updated, 0 rejected
+AGNT: 20 rows inserted/updated, 0 rejected
+AGO: 20 rows inserted/updated, 0 rejected
+AGPU: 20 rows inserted/updated, 0 rejected
+AGRO: 20 rows inserted/updated, 0 rejected
+AGRZ: split detected, refreshing full history
+AGRZ: 20 rows inserted/updated, 0 rejected
+AGX: 20 rows inserted/updated, 0 rejected
+AGYS: 20 rows inserted/updated, 0 rejected
+AHCO: 20 rows inserted/updated, 0 rejected
+AHG: 20 rows inserted/updated, 0 rejected
+$AHL-D: possibly delisted; no timezone found
+AHL-D: no data
+$AHL-E: possibly delisted; no timezone found
+AHL-E: no data
+$AHL-F: possibly delisted; no timezone found
+AHL-F: no data
+AHMA: 20 rows inserted/updated, 0 rejected
+AHR: 20 rows inserted/updated, 0 rejected
+AHRT: 20 rows inserted/updated, 0 rejected
+$AHRT-A: possibly delisted; no timezone found
+AHRT-A: no data
+AHT: 20 rows inserted/updated, 0 rejected
+$AHT-D: possibly delisted; no timezone found
+AHT-D: no data
+$AHT-F: possibly delisted; no timezone found
+AHT-F: no data
+$AHT-G: possibly delisted; no timezone found
+AHT-G: no data
+$AHT-H: possibly delisted; no timezone found
+AHT-H: no data
+$AHT-I: possibly delisted; no timezone found
+AHT-I: no data
+AI: 20 rows inserted/updated, 0 rejected
+AIAI: 20 rows inserted/updated, 0 rejected
+AIB: 20 rows inserted/updated, 0 rejected
+AIDX: 20 rows inserted/updated, 0 rejected
+AIFA: 20 rows inserted/updated, 0 rejected
+AIFC: 20 rows inserted/updated, 0 rejected
+AIFF: 20 rows inserted/updated, 0 rejected
+AIFU: 20 rows inserted/updated, 0 rejected
+AIG: 20 rows inserted/updated, 0 rejected
+$AIHS: possibly delisted; no price data found  (1d 2026-04-28 -> 2026-11-17)
+AIHS: no data
+AII: 20 rows inserted/updated, 0 rejected
+AIIA: 20 rows inserted/updated, 0 rejected
+AIIO: split detected, refreshing full history
+AIIO: 1674 rows inserted/updated, 0 rejected
+AIIOW: 1 rows inserted/updated, 0 rejected
+AIIR: 20 rows inserted/updated, 0 rejected
+AIM: 20 rows inserted/updated, 0 rejected
+AIMD: 20 rows inserted/updated, 0 rejected
+AIMDW: 0 rows inserted/updated, 1 rejected
+AIN: 20 rows inserted/updated, 0 rejected
+AIO: 20 rows inserted/updated, 0 rejected
+AIOS: 20 rows inserted/updated, 0 rejected
+AIOT: 20 rows inserted/updated, 0 rejected
+AIP: 20 rows inserted/updated, 0 rejected
+AIR: 20 rows inserted/updated, 0 rejected
+AIRE: 20 rows inserted/updated, 0 rejected
+AIRG: 20 rows inserted/updated, 0 rejected
+AIRI: 20 rows inserted/updated, 0 rejected
+AIRJ: 20 rows inserted/updated, 0 rejected
+AIRJW: 0 rows inserted/updated, 1 rejected
+AIRO: 20 rows inserted/updated, 0 rejected
+AIRS: 20 rows inserted/updated, 0 rejected
+AIRT: 20 rows inserted/updated, 0 rejected
+AIRTP: 20 rows inserted/updated, 0 rejected
+AISP: 20 rows inserted/updated, 0 rejected
+AISPW: 0 rows inserted/updated, 1 rejected
+AIT: 20 rows inserted/updated, 0 rejected
+AIV: 20 rows inserted/updated, 0 rejected
+AIXC: 1 rows inserted/updated, 0 rejected
+AIXI: split detected, refreshing full history
+AIXI: 187 rows inserted/updated, 0 rejected
+AIZ: 20 rows inserted/updated, 0 rejected
+AIZN: 20 rows inserted/updated, 0 rejected
+AJG: 20 rows inserted/updated, 0 rejected
+AKA: 20 rows inserted/updated, 0 rejected
+AKAM: 20 rows inserted/updated, 0 rejected
+AKAN: 20 rows inserted/updated, 0 rejected
+AKBA: 20 rows inserted/updated, 0 rejected
+AKO-A: 20 rows inserted/updated, 0 rejected
+AKO-B: 20 rows inserted/updated, 0 rejected
+AKR: 20 rows inserted/updated, 0 rejected
+AKTS: 20 rows inserted/updated, 0 rejected
+AKTX: 20 rows inserted/updated, 0 rejected
+ALAB: 20 rows inserted/updated, 0 rejected
+ALAR: 20 rows inserted/updated, 0 rejected
+ALB: 20 rows inserted/updated, 0 rejected
+$ALB-A: possibly delisted; no timezone found
+ALB-A: no data
+$ALBT: possibly delisted; no price data found  (1d 1927-12-12 -> 2026-11-17) (Yahoo error = "No data found, symbol may be delisted")
+ALBT: no data
+ALC: 20 rows inserted/updated, 0 rejected
+ALCO: 20 rows inserted/updated, 0 rejected
+ALDF: 7 rows inserted/updated, 0 rejected
+ALDFU: 13 rows inserted/updated, 0 rejected
+ALDFW: 0 rows inserted/updated, 1 rejected
+ALDX: 20 rows inserted/updated, 0 rejected
+Progress: 300/7165
+ALEC: 20 rows inserted/updated, 0 rejected
+ALF: 20 rows inserted/updated, 0 rejected
+ALFUU: 20 rows inserted/updated, 0 rejected
+ALFUW: 0 rows inserted/updated, 1 rejected
+ALG: 20 rows inserted/updated, 0 rejected
+ALGM: 20 rows inserted/updated, 0 rejected
+ALGN: 20 rows inserted/updated, 0 rejected
+ALGS: 20 rows inserted/updated, 0 rejected
+ALGT: 20 rows inserted/updated, 0 rejected
+ALH: 20 rows inserted/updated, 0 rejected
+ALHC: 20 rows inserted/updated, 0 rejected
+ALIS: 20 rows inserted/updated, 0 rejected
+ALISR: Period 'max' is invalid, must be one of: 1d, 5d
+ALISR: no data
+ALIT: split detected, refreshing full history
+ALIT: 20 rows inserted/updated, 0 rejected
+ALK: 21 rows inserted/updated, 0 rejected
+ALKS: 20 rows inserted/updated, 0 rejected
+ALKT: 20 rows inserted/updated, 0 rejected
+ALL: 20 rows inserted/updated, 0 rejected
+$ALL-B: possibly delisted; no timezone found
+ALL-B: no data
+$ALL-H: possibly delisted; no timezone found
+ALL-H: no data
+$ALL-I: possibly delisted; no timezone found
+ALL-I: no data
+$ALL-J: possibly delisted; no timezone found
+ALL-J: no data
+ALLE: 20 rows inserted/updated, 0 rejected
+ALLO: 20 rows inserted/updated, 0 rejected
+ALLR: 20 rows inserted/updated, 0 rejected
+ALLT: 20 rows inserted/updated, 0 rejected
+ALLY: 20 rows inserted/updated, 0 rejected
+ALM: 20 rows inserted/updated, 0 rejected
+ALMR: 20 rows inserted/updated, 0 rejected
+ALMS: 20 rows inserted/updated, 0 rejected
+ALMU: 20 rows inserted/updated, 0 rejected
+ALNT: 20 rows inserted/updated, 0 rejected
+ALNY: 20 rows inserted/updated, 0 rejected
+ALOV: 20 rows inserted/updated, 0 rejected
+ALOVU: 20 rows inserted/updated, 0 rejected
+ALOVW: Period 'max' is invalid, must be one of: 1d, 5d
+ALOVW: no data
+ALOY: 20 rows inserted/updated, 0 rejected
+ALP: split detected, refreshing full history
+ALP: 20 rows inserted/updated, 0 rejected
+ALPS: split detected, refreshing full history
+ALPS: 262 rows inserted/updated, 0 rejected
+ALRM: 20 rows inserted/updated, 0 rejected
+ALRS: 20 rows inserted/updated, 0 rejected
+ALSN: 20 rows inserted/updated, 0 rejected
+ALT: 21 rows inserted/updated, 0 rejected
+ALTG: 20 rows inserted/updated, 0 rejected
+$ALTG-A: possibly delisted; no timezone found
+ALTG-A: no data
+ALTI: 20 rows inserted/updated, 0 rejected
+ALTO: 20 rows inserted/updated, 0 rejected
+ALUB: 20 rows inserted/updated, 0 rejected
+ALV: 20 rows inserted/updated, 0 rejected
+ALVO: 20 rows inserted/updated, 0 rejected
+ALVOW: 0 rows inserted/updated, 1 rejected
+ALX: 20 rows inserted/updated, 0 rejected
+ALXO: 20 rows inserted/updated, 0 rejected
+ALZN: 20 rows inserted/updated, 0 rejected
+AM: 20 rows inserted/updated, 0 rejected
+AMAL: 20 rows inserted/updated, 0 rejected
+AMAN: 20 rows inserted/updated, 0 rejected
+AMAT: 20 rows inserted/updated, 0 rejected
+AMBA: 20 rows inserted/updated, 0 rejected
+AMBO: 20 rows inserted/updated, 0 rejected
+AMBP: 20 rows inserted/updated, 0 rejected
+AMBQ: 20 rows inserted/updated, 0 rejected
+AMBR: 20 rows inserted/updated, 0 rejected
+AMC: 21 rows inserted/updated, 0 rejected
+AMCI: 20 rows inserted/updated, 0 rejected
+AMCR: 20 rows inserted/updated, 0 rejected
+AMCX: 20 rows inserted/updated, 0 rejected
+AMD: 21 rows inserted/updated, 0 rejected
+AME: 20 rows inserted/updated, 0 rejected
+AMG: 20 rows inserted/updated, 0 rejected
+AMGN: 20 rows inserted/updated, 0 rejected
+AMH: 20 rows inserted/updated, 0 rejected
+$AMH-G: possibly delisted; no timezone found
+AMH-G: no data
+$AMH-H: possibly delisted; no timezone found
+AMH-H: no data
+AMIX: split detected, refreshing full history
+AMIX: 20 rows inserted/updated, 0 rejected
+AMKR: 20 rows inserted/updated, 0 rejected
+AMLX: 20 rows inserted/updated, 0 rejected
+AMN: 20 rows inserted/updated, 0 rejected
+AMOD: 21 rows inserted/updated, 0 rejected
+AMODW: 0 rows inserted/updated, 1 rejected
+AMP: 20 rows inserted/updated, 0 rejected
+AMPG: 20 rows inserted/updated, 0 rejected
+AMPGR: Period 'max' is invalid, must be one of: 1d, 5d
+AMPGR: no data
+AMPGZ: Period 'max' is invalid, must be one of: 1d, 5d
+AMPGZ: no data
+AMPH: 20 rows inserted/updated, 0 rejected
+AMPL: 20 rows inserted/updated, 0 rejected
+AMPX: 20 rows inserted/updated, 0 rejected
+AMPY: 20 rows inserted/updated, 0 rejected
+AMR: 20 rows inserted/updated, 0 rejected
+AMRC: 20 rows inserted/updated, 0 rejected
+AMRN: 20 rows inserted/updated, 0 rejected
+AMRX: 20 rows inserted/updated, 0 rejected
+AMRZ: 20 rows inserted/updated, 0 rejected
+AMS: 20 rows inserted/updated, 0 rejected
+AMSC: 20 rows inserted/updated, 0 rejected
+AMSF: 20 rows inserted/updated, 0 rejected
+AMSS: 20 rows inserted/updated, 0 rejected
+AMST: 20 rows inserted/updated, 0 rejected
+AMT: 20 rows inserted/updated, 0 rejected
+Progress: 400/7165
+AMTB: 20 rows inserted/updated, 0 rejected
+AMTD: split detected, refreshing full history
+AMTD: 220 rows inserted/updated, 0 rejected
+AMTM: 20 rows inserted/updated, 0 rejected
+AMTX: 20 rows inserted/updated, 0 rejected
+AMWL: 20 rows inserted/updated, 0 rejected
+AMX: 20 rows inserted/updated, 0 rejected
+AMZE: split detected, refreshing full history
+AMZE: 20 rows inserted/updated, 0 rejected
+AMZN: 21 rows inserted/updated, 0 rejected
+AN: 20 rows inserted/updated, 0 rejected
+ANAB: 20 rows inserted/updated, 0 rejected
+ANDE: 20 rows inserted/updated, 0 rejected
+ANDG: 20 rows inserted/updated, 0 rejected
+ANET: 21 rows inserted/updated, 0 rejected
+ANF: 20 rows inserted/updated, 0 rejected
+$ANG-D: possibly delisted; no timezone found
+ANG-D: no data
+ANGH: 20 rows inserted/updated, 0 rejected
+ANGHW: 0 rows inserted/updated, 1 rejected
+ANGI: 20 rows inserted/updated, 0 rejected
+ANGO: 20 rows inserted/updated, 0 rejected
+ANGX: 20 rows inserted/updated, 0 rejected
+ANIK: 20 rows inserted/updated, 0 rejected
+ANIP: 20 rows inserted/updated, 0 rejected
+ANIX: 20 rows inserted/updated, 0 rejected
+ANL: 20 rows inserted/updated, 0 rejected
+ANNA: 20 rows inserted/updated, 0 rejected
+ANNAW: 0 rows inserted/updated, 1 rejected
+ANNX: 20 rows inserted/updated, 0 rejected
+ANPA: 20 rows inserted/updated, 0 rejected
+ANRO: 20 rows inserted/updated, 0 rejected
+$ANSC: possibly delisted; no price data found  (1d 1927-12-12 -> 2026-11-17)
+ANSC: no data
+$ANSCU: possibly delisted; no price data found  (1d 1927-12-12 -> 2026-11-17)
+ANSCU: no data
+$ANSCW: possibly delisted; no price data found  (1d 1927-12-12 -> 2026-11-17)
+ANSCW: no data
+ANTA: 20 rows inserted/updated, 0 rejected
+ANTX: 20 rows inserted/updated, 0 rejected
+ANVS: 20 rows inserted/updated, 0 rejected
+ANY: 20 rows inserted/updated, 0 rejected
+AOD: 20 rows inserted/updated, 0 rejected
+AOMD: 20 rows inserted/updated, 0 rejected
+AOMN: 20 rows inserted/updated, 0 rejected
+AOMR: 20 rows inserted/updated, 0 rejected
+AON: 20 rows inserted/updated, 0 rejected
+AORT: 20 rows inserted/updated, 0 rejected
+AOS: 20 rows inserted/updated, 0 rejected
+AOSL: 20 rows inserted/updated, 0 rejected
+AOUT: 20 rows inserted/updated, 0 rejected
+AP: 20 rows inserted/updated, 0 rejected
+APA: 20 rows inserted/updated, 0 rejected
+APAC: 20 rows inserted/updated, 0 rejected
+APACR: Period 'max' is invalid, must be one of: 1d, 5d
+APACR: no data
+APACU: 20 rows inserted/updated, 0 rejected
+APAM: 20 rows inserted/updated, 0 rejected
+APC: 20 rows inserted/updated, 0 rejected
+APD: 20 rows inserted/updated, 0 rejected
+APEI: 20 rows inserted/updated, 0 rejected
+APG: 20 rows inserted/updated, 0 rejected
+APH: split detected, refreshing full history
+APH: 20 rows inserted/updated, 0 rejected
+API: 20 rows inserted/updated, 0 rejected
+APLD: 21 rows inserted/updated, 0 rejected
+APLE: 20 rows inserted/updated, 0 rejected
+APLM: 20 rows inserted/updated, 0 rejected
+APLMW: 0 rows inserted/updated, 1 rejected
+$APM: possibly delisted; no price data found  (1d 1927-12-12 -> 2026-11-17)
+APM: no data
+APO: 20 rows inserted/updated, 0 rejected
+$APO-A: possibly delisted; no timezone found
+APO-A: no data
+APOG: 20 rows inserted/updated, 0 rejected
+APOS: 20 rows inserted/updated, 0 rejected
+APP: 20 rows inserted/updated, 0 rejected
+APPF: 20 rows inserted/updated, 0 rejected
+APPN: 20 rows inserted/updated, 0 rejected
+APPS: 20 rows inserted/updated, 0 rejected
+APRE: 20 rows inserted/updated, 0 rejected
+APT: 20 rows inserted/updated, 0 rejected
+APTV: 20 rows inserted/updated, 0 rejected
+$APURU: possibly delisted; no price data found  (1d 1927-12-12 -> 2026-11-17)
+APURU: no data
+APUS: split detected, refreshing full history
+APUS: 20 rows inserted/updated, 0 rejected
+APVO: 20 rows inserted/updated, 0 rejected
+APWC: 20 rows inserted/updated, 0 rejected
+APXT: 20 rows inserted/updated, 0 rejected
+APXTU: 20 rows inserted/updated, 0 rejected
+APXTW: 1 rows inserted/updated, 0 rejected
+APYX: 20 rows inserted/updated, 0 rejected
+AQB: 20 rows inserted/updated, 0 rejected
+AQMS: 20 rows inserted/updated, 0 rejected
+AQN: 20 rows inserted/updated, 0 rejected
+AQNB: 20 rows inserted/updated, 0 rejected
+AQST: 20 rows inserted/updated, 0 rejected
+AR: 20 rows inserted/updated, 0 rejected
+ARAI: split detected, refreshing full history
+ARAI: 379 rows inserted/updated, 0 rejected
+ARAY: split detected, refreshing full history
+ARAY: 4975 rows inserted/updated, 0 rejected
+ARBB: 20 rows inserted/updated, 0 rejected
+ARBE: 20 rows inserted/updated, 0 rejected
+ARBEW: 0 rows inserted/updated, 1 rejected
+ARBK: 20 rows inserted/updated, 0 rejected
+ARCB: 20 rows inserted/updated, 0 rejected
+ARCC: 20 rows inserted/updated, 0 rejected
+ARCI: 20 rows inserted/updated, 0 rejected
+ARCIU: 20 rows inserted/updated, 0 rejected
+ARCIW: Period 'max' is invalid, must be one of: 1d, 5d
+ARCIW: no data
+ARCL: 20 rows inserted/updated, 0 rejected
+Progress: 500/7165
+ARCLR: 20 rows inserted/updated, 0 rejected
+ARCLU: 20 rows inserted/updated, 0 rejected
+ARCLW: Period 'max' is invalid, must be one of: 1d, 5d
+ARCLW: no data
+ARCO: 20 rows inserted/updated, 0 rejected
+ARCT: 20 rows inserted/updated, 0 rejected
+ARDC: 20 rows inserted/updated, 0 rejected
+ARDT: 20 rows inserted/updated, 0 rejected
+ARDX: 20 rows inserted/updated, 0 rejected
+ARE: 20 rows inserted/updated, 0 rejected
+AREC: 20 rows inserted/updated, 0 rejected
+AREN: 0 rows inserted/updated, 1 rejected
+ARES: 20 rows inserted/updated, 0 rejected
+$ARES-B: possibly delisted; no timezone found
+ARES-B: no data
+ARGX: 20 rows inserted/updated, 0 rejected
+ARHS: 20 rows inserted/updated, 0 rejected
+ARI: 20 rows inserted/updated, 0 rejected
+ARIS: 20 rows inserted/updated, 0 rejected
+ARKO: 20 rows inserted/updated, 0 rejected
+ARKR: 20 rows inserted/updated, 0 rejected
+ARL: 20 rows inserted/updated, 0 rejected
+ARLO: 20 rows inserted/updated, 0 rejected
+ARLP: 20 rows inserted/updated, 0 rejected
+ARM: 21 rows inserted/updated, 0 rejected
+ARMK: 20 rows inserted/updated, 0 rejected
+ARMP: 20 rows inserted/updated, 0 rejected
+AROC: 20 rows inserted/updated, 0 rejected
+AROW: 20 rows inserted/updated, 0 rejected
+ARQ: 20 rows inserted/updated, 0 rejected
+ARQQ: 20 rows inserted/updated, 0 rejected
+ARQQW: 0 rows inserted/updated, 1 rejected
+ARQT: 20 rows inserted/updated, 0 rejected
+ARR: 20 rows inserted/updated, 0 rejected
+$ARR-C: possibly delisted; no timezone found
+ARR-C: no data
+ARRY: 20 rows inserted/updated, 0 rejected
+ARTC: 20 rows inserted/updated, 0 rejected
+ARTCU: 20 rows inserted/updated, 0 rejected
+ARTCW: Period 'max' is invalid, must be one of: 1d, 5d
+ARTCW: no data
+ARTL: split detected, refreshing full history
+ARTL: 20 rows inserted/updated, 0 rejected
+ARTNA: 20 rows inserted/updated, 0 rejected
+ARTV: 20 rows inserted/updated, 0 rejected
+ARTW: 20 rows inserted/updated, 0 rejected
+ARVN: 20 rows inserted/updated, 0 rejected
+ARW: 20 rows inserted/updated, 0 rejected
+ARWR: 20 rows inserted/updated, 0 rejected
+ARX: 20 rows inserted/updated, 0 rejected
+ARXS: 20 rows inserted/updated, 0 rejected
+AS: 20 rows inserted/updated, 0 rejected
+ASA: 20 rows inserted/updated, 0 rejected
+ASAN: 20 rows inserted/updated, 0 rejected
+ASB: 20 rows inserted/updated, 0 rejected
+$ASB-E: possibly delisted; no timezone found
+ASB-E: no data
+$ASB-F: possibly delisted; no timezone found
+ASB-F: no data
+ASBA: 20 rows inserted/updated, 0 rejected
+ASBP: 20 rows inserted/updated, 0 rejected
+ASBPW: 0 rows inserted/updated, 1 rejected
+ASC: 20 rows inserted/updated, 0 rejected
+ASG: 20 rows inserted/updated, 0 rejected
+ASGI: 20 rows inserted/updated, 0 rejected
+ASH: 20 rows inserted/updated, 0 rejected
+ASIC: 20 rows inserted/updated, 0 rejected
+ASIX: 20 rows inserted/updated, 0 rejected
+ASLE: 20 rows inserted/updated, 0 rejected
+ASM: 20 rows inserted/updated, 0 rejected
+ASMB: 20 rows inserted/updated, 0 rejected
+ASML: 20 rows inserted/updated, 0 rejected
+ASND: 20 rows inserted/updated, 0 rejected
+ASO: 20 rows inserted/updated, 0 rejected
+ASPC: 20 rows inserted/updated, 0 rejected
+ASPCR: Period 'max' is invalid, must be one of: 1d, 5d
+ASPCR: no data
+ASPCU: 20 rows inserted/updated, 1 rejected
+ASPI: 20 rows inserted/updated, 0 rejected
+ASPN: 20 rows inserted/updated, 0 rejected
+ASPS: 20 rows inserted/updated, 0 rejected
+ASPSW: 1 rows inserted/updated, 0 rejected
+ASPSZ: 1 rows inserted/updated, 0 rejected
+ASR: 20 rows inserted/updated, 0 rejected
+ASRV: 20 rows inserted/updated, 0 rejected
+ASST: 21 rows inserted/updated, 0 rejected
+ASTC: 20 rows inserted/updated, 0 rejected
+ASTE: 20 rows inserted/updated, 0 rejected
+ASTH: 20 rows inserted/updated, 0 rejected
+ASTI: 20 rows inserted/updated, 0 rejected
+ASTL: 20 rows inserted/updated, 0 rejected
+ASTLW: 0 rows inserted/updated, 1 rejected
+ASTS: 21 rows inserted/updated, 0 rejected
+ASUR: 20 rows inserted/updated, 0 rejected
+ASX: 20 rows inserted/updated, 0 rejected
+ASYS: 20 rows inserted/updated, 0 rejected
+ATAI: 0 rows inserted/updated, 1 rejected
+ATAT: 20 rows inserted/updated, 0 rejected
+ATCH: 21 rows inserted/updated, 0 rejected
+ATCX: 20 rows inserted/updated, 0 rejected
+ATEC: 20 rows inserted/updated, 0 rejected
+ATEN: 20 rows inserted/updated, 0 rejected
+ATER: 20 rows inserted/updated, 0 rejected
+ATEX: 20 rows inserted/updated, 0 rejected
+ATGL: 20 rows inserted/updated, 0 rejected
+$ATH-A: possibly delisted; no timezone found
+ATH-A: no data
+$ATH-B: possibly delisted; no timezone found
+ATH-B: no data
+Progress: 600/7165
+$ATH-D: possibly delisted; no timezone found
+ATH-D: no data
+$ATH-E: possibly delisted; no timezone found
+ATH-E: no data
+ATHE: 20 rows inserted/updated, 0 rejected
+ATHM: 20 rows inserted/updated, 0 rejected
+ATHR: 20 rows inserted/updated, 0 rejected
+ATHS: 20 rows inserted/updated, 0 rejected
+ATI: 20 rows inserted/updated, 0 rejected
+ATII: 20 rows inserted/updated, 0 rejected
+ATIIU: 2 rows inserted/updated, 0 rejected
+ATIIW: 0 rows inserted/updated, 1 rejected
+ATKR: 1 rows inserted/updated, 0 rejected
+ATLC: 20 rows inserted/updated, 0 rejected
+ATLCL: 20 rows inserted/updated, 0 rejected
+ATLCP: 20 rows inserted/updated, 0 rejected
+ATLCZ: 20 rows inserted/updated, 0 rejected
+$ATLN: possibly delisted; no price data found  (1d 1927-12-12 -> 2026-11-17)
+ATLN: no data
+ATLO: 20 rows inserted/updated, 0 rejected
+ATLX: 20 rows inserted/updated, 0 rejected
+ATMU: 20 rows inserted/updated, 0 rejected
+ATNI: 20 rows inserted/updated, 0 rejected
+ATNM: 20 rows inserted/updated, 0 rejected
+ATO: 20 rows inserted/updated, 0 rejected
+ATOM: 20 rows inserted/updated, 0 rejected
+ATOS: 20 rows inserted/updated, 0 rejected
+ATPC: 20 rows inserted/updated, 0 rejected
+ATR: 20 rows inserted/updated, 0 rejected
+ATRA: 20 rows inserted/updated, 0 rejected
+ATRC: 20 rows inserted/updated, 0 rejected
+ATRO: 20 rows inserted/updated, 0 rejected
+ATS: 20 rows inserted/updated, 0 rejected
+ATXG: 20 rows inserted/updated, 0 rejected
+ATYR: split detected, refreshing full history
+ATYR: 2900 rows inserted/updated, 0 rejected
+AU: 20 rows inserted/updated, 0 rejected
+AUB: 20 rows inserted/updated, 0 rejected
+$AUB-A: possibly delisted; no timezone found
+AUB-A: no data
+AUBN: 20 rows inserted/updated, 0 rejected
+AUC: 20 rows inserted/updated, 0 rejected
+AUDC: 20 rows inserted/updated, 0 rejected
+AUGO: 20 rows inserted/updated, 0 rejected
+AUID: 20 rows inserted/updated, 0 rejected
+AUNA: 20 rows inserted/updated, 0 rejected
+AUPH: 20 rows inserted/updated, 0 rejected
+AUR: 20 rows inserted/updated, 0 rejected
+AURA: 20 rows inserted/updated, 0 rejected
+AURE: 20 rows inserted/updated, 0 rejected
+AUROW: 0 rows inserted/updated, 1 rejected
+AUST: 20 rows inserted/updated, 0 rejected
+AUTL: 20 rows inserted/updated, 0 rejected
+AUUD: 20 rows inserted/updated, 0 rejected
+AVA: 20 rows inserted/updated, 0 rejected
+AVAH: 20 rows inserted/updated, 0 rejected
+AVAL: 20 rows inserted/updated, 0 rejected
+AVAV: 20 rows inserted/updated, 0 rejected
+AVB: split detected, refreshing full history
+AVB: 0 rows inserted/updated, 1 rejected
+AVBC: 20 rows inserted/updated, 0 rejected
+AVBH: 20 rows inserted/updated, 0 rejected
+AVBP: 20 rows inserted/updated, 0 rejected
+AVD: 20 rows inserted/updated, 0 rejected
+AVEX: 20 rows inserted/updated, 0 rejected
+AVGO: 21 rows inserted/updated, 0 rejected
+AVIR: 20 rows inserted/updated, 0 rejected
+AVK: 20 rows inserted/updated, 0 rejected
+AVLN: 20 rows inserted/updated, 0 rejected
+$AVNS: possibly delisted; no price data found  (1d 1927-12-12 -> 2026-11-17)
+AVNS: no data
+AVNT: 20 rows inserted/updated, 0 rejected
+AVNW: 20 rows inserted/updated, 0 rejected
+AVO: 20 rows inserted/updated, 0 rejected
+AVPT: 20 rows inserted/updated, 0 rejected
+AVR: 20 rows inserted/updated, 0 rejected
+AVT: 20 rows inserted/updated, 0 rejected
+AVTR: 20 rows inserted/updated, 0 rejected
+AVTX: 20 rows inserted/updated, 0 rejected
+AVX: 20 rows inserted/updated, 0 rejected
+AVXL: 20 rows inserted/updated, 0 rejected
+AVY: 20 rows inserted/updated, 0 rejected
+AWF: 20 rows inserted/updated, 0 rejected
+AWI: 20 rows inserted/updated, 0 rejected
+AWK: 20 rows inserted/updated, 0 rejected
+AWP: 20 rows inserted/updated, 0 rejected
+AWR: 20 rows inserted/updated, 0 rejected
+AWRE: 20 rows inserted/updated, 0 rejected
+AWX: 20 rows inserted/updated, 0 rejected
+AX: 20 rows inserted/updated, 0 rejected
+AXG: split detected, refreshing full history
+AXG: 802 rows inserted/updated, 0 rejected
+AXGN: 20 rows inserted/updated, 0 rejected
+$AXIA-: possibly delisted; no timezone found
+AXIA-: no data
+$AXIA-C: possibly delisted; no timezone found
+AXIA-C: no data
+AXIL: 20 rows inserted/updated, 0 rejected
+AXIN: 20 rows inserted/updated, 0 rejected
+AXINR: Period 'max' is invalid, must be one of: 1d, 5d
+AXINR: no data
+AXINU: 20 rows inserted/updated, 0 rejected
+AXON: 20 rows inserted/updated, 0 rejected
+AXP: 20 rows inserted/updated, 0 rejected
+AXR: 20 rows inserted/updated, 0 rejected
+AXS: 20 rows inserted/updated, 0 rejected
+$AXS-E: possibly delisted; no timezone found
+AXS-E: no data
+AXSM: 20 rows inserted/updated, 0 rejected
+AXTA: 20 rows inserted/updated, 0 rejected
+AXTI: 21 rows inserted/updated, 0 rejected
+Progress: 700/7165
+AYA: 20 rows inserted/updated, 0 rejected
+AYI: 20 rows inserted/updated, 0 rejected
+AYTU: 20 rows inserted/updated, 0 rejected
+AZ: 20 rows inserted/updated, 0 rejected
+AZI: 20 rows inserted/updated, 0 rejected
+AZN: 20 rows inserted/updated, 0 rejected
+AZO: 20 rows inserted/updated, 0 rejected
+AZTA: 20 rows inserted/updated, 0 rejected
+AZTR: split detected, refreshing full history
+AZTR: 858 rows inserted/updated, 0 rejected
+AZZ: 20 rows inserted/updated, 0 rejected
+B: 20 rows inserted/updated, 0 rejected
+BA: 21 rows inserted/updated, 0 rejected
+$BA-A: possibly delisted; no timezone found
+BA-A: no data
+BABA: 20 rows inserted/updated, 0 rejected
+BAC: 21 rows inserted/updated, 0 rejected
+$BAC-B: possibly delisted; no timezone found
+BAC-B: no data
+$BAC-E: possibly delisted; no timezone found
+BAC-E: no data
+$BAC-K: possibly delisted; no timezone found
+BAC-K: no data
+$BAC-L: possibly delisted; no timezone found
+BAC-L: no data
+$BAC-M: possibly delisted; no timezone found
+BAC-M: no data
+$BAC-N: possibly delisted; no timezone found
+BAC-N: no data
+$BAC-O: possibly delisted; no timezone found
+BAC-O: no data
+$BAC-P: possibly delisted; no timezone found
+BAC-P: no data
+$BAC-Q: possibly delisted; no timezone found
+BAC-Q: no data
+$BAC-S: possibly delisted; no timezone found
+BAC-S: no data
+BACC: 20 rows inserted/updated, 0 rejected
+BACCR: Period 'max' is invalid, must be one of: 1d, 5d
+BACCR: no data
+BACCU: 20 rows inserted/updated, 0 rejected
+BAER: 20 rows inserted/updated, 0 rejected
+BAERW: 0 rows inserted/updated, 1 rejected
+BAFN: 20 rows inserted/updated, 0 rejected
+BAH: 20 rows inserted/updated, 0 rejected
+BAK: 20 rows inserted/updated, 0 rejected
+BALL: 20 rows inserted/updated, 0 rejected
+BALY: 20 rows inserted/updated, 0 rejected
+BAM: 20 rows inserted/updated, 0 rejected
+BANC: 20 rows inserted/updated, 0 rejected
+$BANC-F: possibly delisted; no timezone found
+BANC-F: no data
+BAND: 20 rows inserted/updated, 0 rejected
+BANF: 20 rows inserted/updated, 0 rejected
+BANFP: 20 rows inserted/updated, 0 rejected
+BANL: split detected, refreshing full history
+BANL: 20 rows inserted/updated, 0 rejected
+BANR: 20 rows inserted/updated, 0 rejected
+BANX: 20 rows inserted/updated, 0 rejected
+BAOS: 20 rows inserted/updated, 0 rejected
+BAP: 20 rows inserted/updated, 0 rejected
+BARK: 20 rows inserted/updated, 0 rejected
+BATL: 21 rows inserted/updated, 0 rejected
+BATRA: 20 rows inserted/updated, 0 rejected
+BATRK: 20 rows inserted/updated, 0 rejected
+BAX: 20 rows inserted/updated, 0 rejected
+$BAYA: possibly delisted; no price data found  (1d 1927-12-12 -> 2026-11-17)
+BAYA: no data
+BAYAR: Period 'max' is invalid, must be one of: 1d, 5d
+BAYAR: no data
+$BAYAU: possibly delisted; no price data found  (1d 1927-12-12 -> 2026-11-17)
+BAYAU: no data
+BB: 20 rows inserted/updated, 0 rejected
+BBAI: 21 rows inserted/updated, 0 rejected
+BBAR: 20 rows inserted/updated, 0 rejected
+BBBY: 20 rows inserted/updated, 0 rejected
+BBCP: 20 rows inserted/updated, 0 rejected
+BBCQ: 1 rows inserted/updated, 0 rejected

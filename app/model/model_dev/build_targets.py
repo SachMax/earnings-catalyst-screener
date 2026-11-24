@@ -40,7 +40,7 @@ for index, row in df_ed.iterrows():
     try:
         ed_clean_ts = pd.Timestamp(ed_clean)
         before = df.loc[:ed_clean_ts].iloc[-1]
-        close_before = before['close_price']
+        close_before = before['close']
     except (KeyError, IndexError):
         print(f"{ticker}: no price on or before {ed_clean}")
         continue
@@ -50,7 +50,7 @@ for index, row in df_ed.iterrows():
         idx_end = idx_start + 5                    
         if idx_end >= len(df):
             continue
-        close_after = df.iloc[idx_end]['close_price']
+        close_after = df.iloc[idx_end]['close']
     except:
         continue
 
@@ -60,8 +60,12 @@ for index, row in df_ed.iterrows():
     drift_pct = ((close_after - close_before) / close_before) * 100
 
     c.execute("""
-        INSERT OR REPLACE INTO ml_dataset (ticker, earnings_date, target_5d_drift)
+        INSERT INTO ml_dataset
+        (ticker, earnings_date, target_5d_drift)
         VALUES (?, ?, ?)
+        ON CONFLICT(ticker, earnings_date)
+        DO UPDATE SET
+            target_5d_drift = excluded.target_5d_drift
     """, (ticker, ed_clean.strftime('%Y-%m-%d'), round(drift_pct, 4)))
     conn.commit()
     print(f"{ticker} {ed_clean}: drift = {round(drift_pct,2)}%")

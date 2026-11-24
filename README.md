@@ -1,9 +1,8 @@
 # 📈 Earnings Catalyst Screener
 
-**A leak‑free, NLP‑augmented quantitative pipeline that ranks upcoming earnings events and predicts post‑earnings drift.**
+**An NLP-augmented quantitative research pipeline that screens upcoming earnings events and estimates post-earnings drift.**
 
 [![Live Dashboard](https://img.shields.io/badge/Live-Dashboard-brightgreen)](https://sachmax-earnings-catalyst-screener.streamlit.app)
-[![SSRN Preprint](https://img.shields.io/badge/SSRN-Preprint-blue)](https://papers.ssrn.com/abstract=7009759)
 
 ![Dashboard Screenshot](<Screenshot 2026-06-29 170116-1.png>)
 
@@ -11,25 +10,25 @@
 
 ## 🧠 What It Does
 
-The Earnings Catalyst Screener is a fully automated, production‑grade system that:
+The Earnings Catalyst Screener is an end-to-end quantitative research system designed to:
 
-- Ingests SEC filings, price history, and analyst data for 200k+ earnings events
-- Computes **75+ point‑in‑time features** (fundamentals, technicals, sentiment, volatility, and more)
-- Screens upcoming stocks with a **30‑filter rule‑based framework** that assigns conviction levels and trading phases (Phase 2/4/5)
-- Uses a **Random Forest classifier** to predict the probability of a significant post‑earnings drift
-- Enhances guidance detection with a **fine‑tuned FinBERT model** (F1 0.92) that reads 8‑K filings
-- Generates a **daily‑updated dashboard** displaying trade candidates, model predictions, and guidance probabilities
+- Ingest SEC filings, price history, and analyst data for **200k+ historical earnings events**
+- Compute **75+ engineered features** across fundamentals, technicals, sentiment, volatility, and market context
+- Screen upcoming stocks with a **30-filter rule-based framework** that evaluates conviction and trading phases
+- Use a **Random Forest classifier** in the deployed prediction pipeline to estimate the probability of significant post-earnings drift
+- Enhance guidance detection with a **fine-tuned FinBERT model** (previously reported F1: **0.92**) that analyzes earnings-related filings and text
+- Generate a **Streamlit dashboard** displaying upcoming earnings candidates, model predictions, and guidance probabilities
 
 ---
 
 ## Key Features
 
-- **Leak‑free feature engineering** — every feature is point‑in‑time safe, verified by a manual audit
-- **Phase‑aware screening** — framework distinguishes between pre‑earnings (Phase 2) and post‑earnings (Phase 4) opportunities
-- **NLP‑powered guidance detection** — FinBERT replaces a rule‑based keyword scanner
-- **Fully automated pipeline** — Windows Task Scheduler runs the entire pipeline every morning without manual intervention
-- **Cloud‑connected dashboard** — live Streamlit dashboard backed by a MotherDuck cloud database, refreshed daily
-- **Research‑backed** — documented in a preprint on SSRN with detailed methodology and empirical results
+- **Historical feature engineering** — incorporates event-specific financial and market information; point-in-time availability and leakage controls are being audited and improved
+- **Phase-aware screening** — combines a rule-based earnings framework with market, technical, and fundamental filters; the current live evaluation script focuses on **Phase 2** candidates
+- **NLP-powered guidance detection** — fine-tuned FinBERT supplements rule-based analysis of management guidance
+- **Automated data pipeline** — Python and Windows Task Scheduler support recurring price, calendar, feature, evaluation, and cloud-sync jobs
+- **Cloud-connected dashboard** — Streamlit reads published screening results from **MotherDuck** (cloud DuckDB); automatic refresh depends on the scheduled pipeline running successfully
+- **C++ trading engine** — separate C++17/CMake component for portfolio positions, trade history, and realized P&L, under development
 
 ---
 
@@ -37,12 +36,14 @@ The Earnings Catalyst Screener is a fully automated, production‑grade system t
 
 | Metric | Value |
 |---|---|
-| **Decile Spread** (quality‑filtered) | 30.7 points |
-| **Bottom‑Decile Win Rate** | 1.4% |
-| **Top‑Decile Win Rate** | 32.1% |
-| **FinBERT F1 Score** | 0.92 |
-| **Training Data** | 39k+ quality‑filtered events |
-| **Guidance Corpus** | 103k+ 8‑K transcripts |
+| **Decile Spread** (quality-filtered, earlier experiment) | 30.7 points |
+| **Bottom-Decile Win Rate** (earlier experiment) | 1.4% |
+| **Top-Decile Win Rate** (earlier experiment) | 32.1% |
+| **FinBERT F1 Score** (previous experiment) | 0.92 |
+| **Training Data** (earlier quality-filtered sample) | 39k+ events |
+| **Guidance Corpus** | 103k+ filing/transcript records |
+
+*The results above describe earlier research runs, not independently verified live-trading performance. Model validation and historical feature auditing are ongoing; these figures should not be interpreted as investment returns.*
 
 ---
 
@@ -50,63 +51,96 @@ The Earnings Catalyst Screener is a fully automated, production‑grade system t
 
 👉 [**Launch Dashboard**](https://sachmax-earnings-catalyst-screener.streamlit.app)
 
-The dashboard shows upcoming earnings candidates for the week, grouped by day. Each row includes:
+The dashboard is designed to show upcoming earnings candidates for the week, grouped by day. Each row includes:
 
 - Predicted win probability (Random Forest)
 - Guidance raise probability (FinBERT)
-- Phase and conviction from the 30‑filter framework
+- Phase and conviction from the rule-based screening framework
 
----
-
-## 📝 Research Paper
-
-A detailed description of the system, feature engineering, model evaluation, and results is available on SSRN:
-
-🔗 [Earnings Catalyst Screener – Preprint](https://papers.ssrn.com/abstract=7009759)
+The first dashboard version has been deployed. **Scheduled updates are being restored following a project restructure**, so displayed data may not currently be fresh.
 
 ---
 
 ## 🛠️ Technology Stack
 
-**Languages:** Python, SQL, batch scripting  
-**Machine Learning:** scikit‑learn, XGBoost, Random Forest, PyTorch, HuggingFace Transformers, FinBERT  
+**Languages:** Python, SQL, C++17, batch scripting  
+**Machine Learning:** scikit-learn, CatBoost, XGBoost, Random Forest, PyTorch, Hugging Face Transformers, FinBERT  
 **Data Engineering:** pandas, NumPy, yfinance, SEC EDGAR (edgartools), SQLite  
 **Automation:** Windows Task Scheduler, custom batch scripts  
-**Deployment:** Streamlit, MotherDuck (cloud DuckDB)
+**Deployment:** Streamlit, MotherDuck (cloud DuckDB)  
+**C++ Development:** STL, CMake
 
 ---
 
 ## 📁 Repository Structure
-```
+
+```text
 ├── app/
-│   ├── features_library.py         # Consolidated library of 75+ point‑in‑time feature functions
-│   ├── train_model.py              # Model training & evaluation
-│   ├── daily_update_features.py    # Refreshes upcoming events
-│   ├── historical_feature.py       # Backfills past events for upcoming tickers
-│   ├── evaluation_features.py      # 30‑filter rule‑based screening
-│   ├── generate_output_dataset.py  # Assembles dashboard data & applies ML model
-│   ├── explore_earnings.py         # Refreshes upcoming earnings calendar
-│   ├── guidance_*.py               # Guidance model training and backfill scripts
-│   ├── populate_features_batch*.py # Incremental historical backfill
-│   ├── run_all_features.py         # Orchestrator for live feature table
-│   ├── feature_*.py                # Individual feature extractors (20+ scripts)
-│   └── dashboard/                  # Streamlit multi‑page dashboard
-│       ├── Home.py
+│   ├── config.py                       # Application and service configuration
+│   ├── features_library.py             # Shared feature engineering library
+│   ├── features_library_corrected.py   # Revised feature-library version
+│   ├── data_pipeline/
+│   │   ├── explore_earnings.py          # Refreshes upcoming earnings calendar
+│   │   ├── daily_update_features.py    # Updates features for upcoming events
+│   │   ├── update_price_history.py     # Updates historical market prices
+│   │   ├── fetch_price_history.py      # Historical price ingestion
+│   │   └── historical_earnings_date.py  # Historical earnings-date utilities
+│   ├── features/                      # Individual feature extractors (20+ scripts)
+│   │   ├── feature_current_earnings_quality.py
+│   │   ├── feature_historical_earnings_quality.py
+│   │   ├── feature_analyst_revision.py
+│   │   ├── feature_sector_relative_strength.py
+│   │   ├── feature_sue.py
+│   │   └── feature_*.py
+│   ├── guidance/                      # FinBERT / guidance data and model scripts
+│   │   ├── guidance_model.py
+│   │   ├── guidance_model_ml_dataset.py
+│   │   ├── guidance_data_asc.py
+│   │   └── guidance_*.py
+│   ├── model/
+│   │   └── model_dev/
+│   │       ├── train_model.py          # Model training and evaluation
+│   │       └── build_targets.py        # Target construction
+│   ├── deploy/
+│   │   ├── run_all_features.py         # Orchestrates feature extractors
+│   │   ├── evaluation_features.py      # Rule-based earnings screening
+│   │   ├── generate_output_dataset.py  # Generates dashboard predictions
+│   │   └── to_duckdc_cloud.py          # Publishes output to MotherDuck
+│   ├── historical_feature.py          # Incremental history for upcoming tickers
+│   ├── populate_features_batch_desc.py # Historical feature backfill
+│   └── dashboard/                     # Streamlit multipage dashboard
+│       ├── home.py
 │       └── pages/
 │           ├── 1_Monday.py
 │           ├── 2_Tuesday.py
 │           ├── 3_Wednesday.py
 │           ├── 4_Thursday.py
 │           ├── 5_Friday.py
-│           └── 3_Column_Guide.py
-├── models/ # Trained model files
-├── my_guidance_model/ # FinBERT guidance model
-├── my_guidance_tokenizer/ # FinBERT tokenizer
-├── run_daily.bat # Daily automation batch file
-├── run_quarterly.bat # Quarterly refresh batch file
-├── requirements.txt # Python dependencies
+│           └── Column_Guide.py
+├── artifacts/
+│   ├── models/
+│   │   ├── rf_classifier.pkl          # Random Forest classifier used by v1
+│   │   ├── preprocessor.pkl           # Saved preprocessing pipeline
+│   │   ├── catboost_classifier.pkl    # Research model artifact
+│   │   ├── rf_classifier_top80.pkl
+│   │   └── rf_regressor.pkl
+│   ├── my_guidance_model/             # Fine-tuned FinBERT weights/config
+│   └── my_guidance_tokenizer/         # FinBERT tokenizer files
+├── automation_scripts/
+│   ├── run_daily.bat                  # Daily pipeline
+│   └── run_quarterly.bat              # Periodic maintenance / refresh
+├── engine/                            # C++17 trading/portfolio engine
+│   ├── apps/
+│   ├── include/
+│   ├── src/
+│   └── CMakeLists.txt
+├── data/                              # Local datasets and SQLite database
+├── tests/                             # Tests
+├── requirements.txt                   # Python dependencies
 └── README.md
 ```
+
+*Some local data, trained artifacts, and environment files may be excluded from Git tracking because of their size or sensitivity.*
 
 ---
 
@@ -114,4 +148,4 @@ A detailed description of the system, feature engineering, model evaluation, and
 
 Built by **Sachio Maximilliano Johan**  
 📧 sachiomaximilliano166@gmail.com  
-🔗 [LinkedIn](https://linkedin.com/in/sachio-maximilliano-johan)   <!-- replace with your real LinkedIn URL -->
+🔗 [LinkedIn](https://linkedin.com/in/sachio-maximilliano-johan)

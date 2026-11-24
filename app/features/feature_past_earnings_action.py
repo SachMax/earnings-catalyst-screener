@@ -46,10 +46,10 @@ df_ed = pd.read_sql(
 
 def get_close_prev(df, target):
     try:
-        return df.loc[target, 'close_price']
+        return df.loc[target, 'close']
     except KeyError:
         idx = df.index.get_indexer([target], method='ffill')[0]
-        return df.iloc[idx]['close_price']
+        return df.iloc[idx]['close']
 
 for index,row in df_ed.iterrows(): 
     try:
@@ -95,8 +95,8 @@ for index,row in df_ed.iterrows():
                         continue
                     if idx5 >= len(df):
                         continue
-                    close1 = df['close_price'].iloc[idx1]
-                    close5 = df['close_price'].iloc[idx5]
+                    close1 = df['close'].iloc[idx1]
+                    close5 = df['close'].iloc[idx5]
                     if pd.isna(close0) or pd.isna(close1) or pd.isna(close5) or close0 == 0:
                         continue
                     return01 = (close1 - close0) / close0 * 100

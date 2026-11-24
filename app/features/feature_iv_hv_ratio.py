@@ -47,7 +47,7 @@ for index,row in df_ed.iterrows():
         except Exception as o:
             print(f"{ticker}: error -> {o}")
             continue
-        df['daily_return'] = df['close_price'].pct_change()
+        df['daily_return'] = df['close'].pct_change()
         df['hv'] = df['daily_return'].rolling(20).std()
         hv = df['hv'].iloc[-1]
         if pd.isna(hv) or hv == 0:

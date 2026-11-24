@@ -1,126 +1,70 @@
 @echo off
-cd /d C:\Users\Sachio\Desktop\earnings-catalyst-screener
+setlocal
 
-:: ------------------------------------------------------------------
-:: Configuration
-:: ------------------------------------------------------------------
+REM This file belongs in: <project root>\automation_scripts\run_daily.bat
+for %%I in ("%~dp0..") do set "ROOT=%%~fI"
+cd /d "%ROOT%" || exit /b 1
 
-set PYTHON=C:\Users\Sachio\Desktop\earnings-catalyst-screener\.venv\Scripts\python.exe
-set LOG=run_log.txt
+set "PYTHON=%ROOT%\.venv\Scripts\python.exe"
+set "PYTHONPATH=%ROOT%\app;%ROOT%;%PYTHONPATH%"
+set "LOGDIR=%ROOT%\runtime\run_log"
+set "STATUSDIR=%ROOT%\runtime\log_status"
 
-:: Delete yesterday's log
-if exist "%LOG%" del /q "%LOG%"
+if not exist "%PYTHON%" (
+    echo ERROR: Python not found: "%PYTHON%"
+    exit /b 1
+)
+if not exist "%LOGDIR%" mkdir "%LOGDIR%"
+if not exist "%STATUSDIR%" mkdir "%STATUSDIR%"
 
-echo ===============================================================>>"%LOG%"
-echo [%date% %time%] Daily pipeline started>>"%LOG%"
-echo ===============================================================>>"%LOG%"
-
-:: Daily marker
-set TODAY_FILE=last_daily_%date:/=_%.txt
-
-if exist "%TODAY_FILE%" (
-    echo [%date% %time%] Pipeline already ran today.>>"%LOG%"
-    exit /b
+REM yyyy-MM-dd is stable across Windows regional date settings.
+for /f %%D in ('powershell -NoProfile -Command "Get-Date -Format yyyy-MM-dd"') do set "TODAY=%%D"
+if not defined TODAY (
+    echo ERROR: Could not determine today's date.
+    exit /b 1
 )
 
-:: Internet check
-ping -n 1 8.8.8.8 >nul
+set "LOG=%LOGDIR%\daily_%TODAY%.log"
+set "MARKER=%STATUSDIR%\daily_%TODAY%.done"
+
+if exist "%MARKER%" (
+    echo [%date% %time%] Already completed today.>>"%LOG%"
+    echo Daily pipeline has already completed on %TODAY%.
+    exit /b 0
+)
+
+echo [%date% %time%] DAILY RUN STARTED>>"%LOG%"
+echo Daily pipeline started. Log: "%LOG%"
+
+REM Keep these stages in dependency order.
+call :stage "app\data_pipeline\update_price_history.py" || goto :failed
+call :stage "app\data_pipeline\explore_earnings.py" || goto :failed
+call :stage "app\data_pipeline\daily_update_features.py" || goto :failed
+call :stage "app\deploy\run_all_features.py" || goto :failed
+call :stage "app\deploy\evaluation_features.py" || goto :failed
+call :stage "app\guidance\guidance_bert_output_dataset.py" || goto :failed
+call :stage "app\deploy\generate_output_dataset.py" || goto :failed
+call :stage "app\deploy\to_duckdc_cloud.py" || goto :failed
+
+REM Create the success marker only after ALL stages finish successfully.
+echo Completed on %date% at %time%>"%MARKER%"
+echo [%date% %time%] DAILY RUN SUCCESS>>"%LOG%"
+echo SUCCESS: Daily pipeline completed.
+exit /b 0
+
+:stage
+echo Running %~1
+echo [%date% %time%] START %~1>>"%LOG%"
+"%PYTHON%" -u "%ROOT%\%~1" %~2 >>"%LOG%" 2>&1
 if errorlevel 1 (
-    echo [%date% %time%] ERROR: No internet connection.>>"%LOG%"
-    exit /b
+    echo [%date% %time%] FAILED %~1>>"%LOG%"
+    echo ERROR: %~1 failed. See "%LOG%".
+    exit /b 1
 )
+echo [%date% %time%] FINISH %~1>>"%LOG%"
+exit /b 0
 
-:: ================================================================
-:: Stage 1
-:: ================================================================
-echo [%date% %time%] START  Stage 1 - explore_earnings.py>>"%LOG%"
-%PYTHON% app\explore_earnings.py >>"%LOG%" 2>&1
-if errorlevel 1 goto Stage1Error
-echo [%date% %time%] FINISH Stage 1>>"%LOG%"
-
-:: ================================================================
-:: Stage 2
-:: ================================================================
-echo [%date% %time%] START  Stage 2 - run_all_features.py>>"%LOG%"
-%PYTHON% app\run_all_features.py >>"%LOG%" 2>&1
-if errorlevel 1 goto Stage2Error
-echo [%date% %time%] FINISH Stage 2>>"%LOG%"
-
-:: ================================================================
-:: Stage 3
-:: ================================================================
-echo [%date% %time%] START  Stage 3 - evaluation_features.py>>"%LOG%"
-%PYTHON% app\evaluation_features.py >>"%LOG%" 2>&1
-if errorlevel 1 goto Stage3Error
-echo [%date% %time%] FINISH Stage 3>>"%LOG%"
-
-:: ================================================================
-:: Stage 4
-:: ================================================================
-echo [%date% %time%] START  Stage 4 - daily_update_features.py>>"%LOG%"
-%PYTHON% app\daily_update_features.py >>"%LOG%" 2>&1
-if errorlevel 1 goto Stage4Error
-echo [%date% %time%] FINISH Stage 4>>"%LOG%"
-
-:: ================================================================
-:: Stage 5
-:: ================================================================
-echo [%date% %time%] START  Stage 5 - guidance_bert_output_dataset.py>>"%LOG%"
-%PYTHON% app\guidance_bert_output_dataset.py >>"%LOG%" 2>&1
-if errorlevel 1 goto Stage5Error
-echo [%date% %time%] FINISH Stage 5>>"%LOG%"
-
-:: ================================================================
-:: Stage 6
-:: ================================================================
-echo [%date% %time%] START  Stage 6 - generate_output_dataset.py>>"%LOG%"
-%PYTHON% app\generate_output_dataset.py >>"%LOG%" 2>&1
-if errorlevel 1 goto Stage6Error
-echo [%date% %time%] FINISH Stage 6>>"%LOG%"
-
-:: ================================================================
-:: Stage 7
-:: ================================================================
-echo [%date% %time%] START  Stage 7 - to_duckdc_cloud.py>>"%LOG%"
-%PYTHON% app\to_duckdc_cloud.py >>"%LOG%" 2>&1
-if errorlevel 1 goto Stage7Error
-echo [%date% %time%] FINISH Stage 7>>"%LOG%"
-
-echo done > "%TODAY_FILE%"
-
-echo [%date% %time%] SUCCESS - Full daily pipeline completed>>"%LOG%"
-echo ===============================================================>>"%LOG%"
-
-exit /b
-
-:: ================================================================
-:: Error handlers
-:: ================================================================
-
-:Stage1Error
-echo [%date% %time%] ERROR in Stage 1 (explore_earnings.py)>>"%LOG%"
-exit /b
-
-:Stage2Error
-echo [%date% %time%] ERROR in Stage 2 (run_all_features.py)>>"%LOG%"
-exit /b
-
-:Stage3Error
-echo [%date% %time%] ERROR in Stage 3 (evaluation_features.py)>>"%LOG%"
-exit /b
-
-:Stage4Error
-echo [%date% %time%] ERROR in Stage 4 (daily_update_features.py)>>"%LOG%"
-exit /b
-
-:Stage5Error
-echo [%date% %time%] ERROR in Stage 5 (guidance_bert_output_dataset.py)>>"%LOG%"
-exit /b
-
-:Stage6Error
-echo [%date% %time%] ERROR in Stage 6 (generate_output_dataset.py)>>"%LOG%"
-exit /b
-
-:Stage7Error
-echo [%date% %time%] ERROR in Stage 7 (to_duckdc_cloud.py)>>"%LOG%"
-exit /b
+:failed
+echo [%date% %time%] DAILY RUN FAILED - no success marker created>>"%LOG%"
+echo FAILED: Pipeline stopped. It can be retried today.
+exit /b 1

@@ -37,10 +37,10 @@ df_ed = pd.read_sql(
 
 def get_close_prev(df, target):
     try:
-        return df.loc[target, 'close_price']
+        return df.loc[target, 'close']
     except KeyError:
         idx = df.index.get_indexer([target], method='ffill')[0]
-        return df.iloc[idx]['close_price']
+        return df.iloc[idx]['close']
 
 for index,row in df_ed.iterrows(): 
     try:
@@ -92,10 +92,10 @@ for index,row in df_ed.iterrows():
 
                     # 1. Post‑earnings high (first 5 days)
                     first5 = window20.iloc[:5]
-                    post_high = first5['close_price'].max()
+                    post_high = first5['close'].max()
 
                     # Find the first date in first5 that hit this high
-                    high_date = first5[first5['close_price'] == post_high].index[0]
+                    high_date = first5[first5['close'] == post_high].index[0]
                     # Convert that date label to a positional index within window20
                     high_pos = window20.index.get_loc(high_date)
 
@@ -103,8 +103,8 @@ for index,row in df_ed.iterrows():
                     remaining = window20.iloc[high_pos + 1:]
                     if remaining.empty:
                         continue
-                    pull_back = remaining['close_price'].min()
-                    final_close = window20['close_price'].iloc[-1]
+                    pull_back = remaining['close'].min()
+                    final_close = window20['close'].iloc[-1]
                     pullback_pct = (pull_back - post_high) / post_high
                     if pullback_pct <= -0.02 and final_close > post_high:
                         label = "pullback and bounce"

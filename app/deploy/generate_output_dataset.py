@@ -48,8 +48,8 @@ if df_upcoming.empty:
 # ---------------------------------------------------------------------------
 # 2. Load saved model and preprocessor
 # ---------------------------------------------------------------------------
-rf_clf = joblib.load('models/rf_classifier.pkl')
-preprocessor = joblib.load('models/preprocessor.pkl')
+rf_clf = joblib.load('artifacts/models/rf_classifier.pkl')
+preprocessor = joblib.load('artifacts/models/preprocessor.pkl')
 
 # ---------------------------------------------------------------------------
 # 3. Process each upcoming event (with same feature engineering as training)

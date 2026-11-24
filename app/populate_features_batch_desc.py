@@ -1,14 +1,21 @@
 import sqlite3
 import pandas as pd
 import time
-from datetime import date, timedelta
+from pathlib import Path
 from features_library import *
 
 # ---------------------------------------------------------------------------
 # Config – adjust BATCH_SIZE to whatever your daily capacity allows
 # ---------------------------------------------------------------------------
-BATCH_SIZE = 30000   # rows per run
-DB_PATH = 'data/universe.db'
+BATCH_SIZE = 1250          # Test with 5 first; increase later
+START_ROW = 5250          # Next batch: increase by BATCH_SIZE
+updated_rows = 0
+
+DB_PATH = Path('data/universe.db')
+if not DB_PATH.is_file():
+    DB_PATH = Path(__file__).resolve().parents[2] / 'data' / 'universe.db'
+if not DB_PATH.is_file():
+    raise FileNotFoundError(f'Database not found: {DB_PATH}')
 
 conn = sqlite3.connect(DB_PATH)
 conn.execute("PRAGMA busy_timeout = 5000")
@@ -67,25 +74,22 @@ columns = [
     ('high_vol_regime', 'INTEGER'),
 ]
 
+existing = {row[1] for row in c.execute('PRAGMA table_info(ml_dataset)')}
 for col, col_type in columns:
-    try:
-        c.execute(f"ALTER TABLE ml_dataset ADD COLUMN {col} {col_type}")
-    except sqlite3.OperationalError:
-        pass
+    if col not in existing:
+        c.execute(f'ALTER TABLE ml_dataset ADD COLUMN {col} {col_type}')
 conn.commit()
 
 # ---------------------------------------------------------------------------
-# 2. Select a batch of rows that need features – any ticker, any date,
-#    as long as it has a target (i.e., it's a past event) and is missing features.
-#    Prioritise most recent events first.
+# 2. Recalculate past events with the corrected feature definitions.
+#    ORDER BY is fixed so START_ROW can be advanced each batch.
 # ---------------------------------------------------------------------------
-df = pd.read_sql(f"""
+df = pd.read_sql_query("""
     SELECT ticker, earnings_date FROM ml_dataset
-    WHERE runup IS NULL
-      AND target_5d_drift IS NOT NULL
-    ORDER BY earnings_date DESC
-    LIMIT {BATCH_SIZE}
-""", conn, parse_dates=['earnings_date'])
+    WHERE target_5d_drift IS NOT NULL
+    ORDER BY earnings_date DESC, ticker
+    LIMIT ? OFFSET ?
+""", conn, params=(BATCH_SIZE, START_ROW), parse_dates=['earnings_date'])
 
 if df.empty:
     print("No rows left to backfill. All done!")
@@ -96,9 +100,19 @@ print(df.head(5))
 print(f"Processing {len(df)} historical rows...")
 
 def safe_get(val, key=None):
-    if isinstance(val, dict):
-        return val.get(key) if key else None
-    return val
+    if key is not None:
+        val = val.get(key) if isinstance(val, dict) else None
+    if val is None or val is pd.NA:
+        return None
+    if isinstance(val, pd.Series):
+        val = val.iloc[0] if not val.empty else None
+    if val is not None and not isinstance(val, (dict, list)):
+        try:
+            if pd.isna(val):
+                return None
+        except (TypeError, ValueError):
+            pass
+    return val.item() if hasattr(val, 'item') else val
 
 ticker_cache = {}
 
@@ -111,7 +125,8 @@ for counter, (idx, row) in enumerate(df.iterrows(), 1):
             df_price = load_price_history(ticker)
             ed_series = load_earnings_dates(ticker)
             ticker_cache[ticker] = (df_price, ed_series)
-        except:
+        except Exception as exc:
+            print(f'{ticker}: cannot load history: {exc}')
             ticker_cache[ticker] = (pd.DataFrame(), pd.Series())
     df_price, ed_series = ticker_cache[ticker]
 
@@ -140,8 +155,6 @@ for counter, (idx, row) in enumerate(df.iterrows(), 1):
     net_mom = None; has_coverage = None
     if mom:
         net_mom = mom.get('net_analyst_momentum')
-        if net_mom is not None:
-            consensus_proxy = 1 if net_mom > 0 else 0
         rec_mean = mom.get('recommendation_mean')
         up_count = mom.get('upgrade_count')
         down_count = mom.get('downgrade_count')
@@ -150,12 +163,12 @@ for counter, (idx, row) in enumerate(df.iterrows(), 1):
     rev_feats = analyst_revision(ticker, ed)
     insider   = compute_insider_transactions(ticker, ed)
     mcap_feats = compute_market_cap_features(ticker, ed, df_price)
-    sect_info  = compute_sector_industry(ticker)
+    sect_info  = compute_sector_industry(ticker, ed)
     mom_feats  = compute_momentum_features(ed, df_price)
     vol_feats  = compute_volatility_features(ed, df_price)
     vol_pct    = compute_volatility_percentile(ticker, ed, df_price)
 
-    # After computing sec_rel, force scalars
+    # Convert potential pandas scalars before saving
     sec_rel_sector_spy = safe_get(sec_rel, 'sector_spy_return_ratio')
     sec_rel_stock_spy  = safe_get(sec_rel, 'stock_vs_spy_20d')
     sec_rel_stock_sector = safe_get(sec_rel, 'stock_vs_sector_20d')
@@ -249,8 +262,13 @@ for counter, (idx, row) in enumerate(df.iterrows(), 1):
         safe_get(vol_pct, 'hv20_current'), safe_get(vol_pct, 'vol_percentile'), safe_get(vol_pct, 'high_vol_regime'),
         ticker, ed.strftime('%Y-%m-%d')
     ))
+    updated_rows += c.rowcount
     conn.commit()
     time.sleep(0.2)
 
-print(f"Batch complete. {len(df)} rows processed.")
+print(f"Events attempted: {len(df)}")
+print(f"Rows matched by UPDATE: {updated_rows}")
+
+print(f"Batch finished. {len(df)} events attempted.")
+print(f"Next run: set START_ROW = {START_ROW + len(df)}")
 conn.close()

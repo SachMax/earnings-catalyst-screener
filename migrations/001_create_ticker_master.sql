@@ -1,1 +1,0 @@
--- Creates ticker master table
